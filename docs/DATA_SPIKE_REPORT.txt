@@ -1,0 +1,107 @@
+# SIH26102 MPLADS - Data Spike Report
+
+Raw directory: C:\Users\Sufi Shaikh\Downloads\SIH26102-MPLADS\data\raw
+Workbook count: 6
+
+====================================================================================================
+FILE: Allocated Limit for Honble MPs.xlsx
+SIZE_MIB: 0.15
+SHEETS: 1
+  SHEET: Sheet1
+  TARGET: xl/worksheets/sheet1.xml
+  DIMENSION: None
+  ROWS_CAPTURED: 8
+  FIRST_ROWS:
+    ["Allocated Limit for Hon'ble MPs"]
+    ['Sr. No.', 'State', "Hon'ble Members of Parliaments", 'Constituency', 'Allocated AMOUNT ( ₹ )']
+    ['1', 'Maharashtra', 'AASHTIKAR PATIL NAGESH BAPURAO', 'HINGOLI', '190289442']
+    ['2', 'Jammu And Kashmir', 'ABDUL RASHID SHEIKH', 'BARAMULLAH', '154773472.11']
+    ['3', 'Bihar', 'ABHAY KUMAR SINHA', 'AURANGABAD_BR', '147000000']
+    ['4', 'West Bengal', 'ABHIJIT GANGOPADHYAY', 'TAMLUK', '147000000']
+    ['5', 'West Bengal', 'Abu Taher Khan', 'MURSHIDABAD', '147000000']
+    ['6', 'West Bengal', 'ADHIKARI SOUMENDU', 'KANTHI', '147000000']
+====================================================================================================
+FILE: Amount consented for Calamity.xlsx
+SIZE_MIB: 0.02
+SHEETS: 1
+  SHEET: Sheet1
+  TARGET: xl/worksheets/sheet1.xml
+  DIMENSION: None
+  ROWS_CAPTURED: 8
+  FIRST_ROWS:
+    ['Amount consented for Calamity']
+    ['Sr. No.', 'Calamity Type', 'Calamity Name', "Hon'ble Members of Parliament", 'Date of Consent', 'Consent Amount ( ₹ )']
+    ['1', 'National Calamity', 'Flood 2025 in Punjab', 'Shri Gurjeet Singh Aujla', '07-Dec-2025', '7067400']
+    ['2', 'National Calamity', 'Flood 2025 in Punjab', 'GURMEET SINGH MEET HAYER', '03-Nov-2025', '7500000']
+    ['3', 'National Calamity', 'Flood 2025 in Punjab', 'Shri Jual Oram', '10-Oct-2025', '10000000']
+    ['4', 'National Calamity', 'Andhra Pradesh rainfall and consequent floods - 2024', 'Krishna Prasad Tenneti', '26-Mar-2025', '1000000']
+    ['5', 'National Calamity', 'Meppadi landslides 2024', 'SHAFI PARAMBIL', '02-Mar-2025', '2500000']
+    ['6', 'State Calamity', 'Vilangad Landslides 2024', 'SHAFI PARAMBIL', '01-Mar-2025', '2500000']
+====================================================================================================
+FILE: Expenditure on Completed and On-going Works as on Date.xlsx
+SIZE_MIB: 61.50
+SHEETS: 1
+  SHEET: Sheet1
+  TARGET: xl/worksheets/sheet1.xml
+  DIMENSION: None
+  ROWS_CAPTURED: 8
+  FIRST_ROWS:
+    ['Expenditure on Completed and On-going Works as on Date']
+    ['Sr. No.', 'State', 'Work', 'Work ID', 'IDA', "Hon'ble Members of Parliament", 'Constituency', 'Expenditure Date', 'Vendor Name', 'Payment Status', 'Fund Disbursed Amount ( ₹ )']
+    ['1', 'Uttar Pradesh', 'Construction of roads, link roads, pathways or any other road with or without drainage system', 'WS/MP18218/2025-2026/233777', 'GHAZIABAD(DISTRICT MAGISTRAE GHAZIABAD_IDA)', 'ATUL GARG', 'GHAZIABAD', '21-Aug-2026', 'DARSH BUILDCON', 'Payment In-Progress', '799146']
+    ['2', 'Uttar Pradesh', 'Construction of roads, link roads, pathways or any other road with or without drainage system', 'WS/MP18218/2025-2026/233878', 'GHAZIABAD(DISTRICT MAGISTRAE GHAZIABAD_IDA)', 'ATUL GARG', 'GHAZIABAD', '04-Aug-2026', 'DARSH BUILDCON', 'Payment In-Progress', '832080']
+    ['3', 'Uttar Pradesh', 'Construction of roads, link roads, pathways or any other road with or without drainage system', 'WS/MP18218/2025-2026/233781', 'GHAZIABAD(DISTRICT MAGISTRAE GHAZIABAD_IDA)', 'ATUL GARG', 'GHAZIABAD', '04-Aug-2026', 'DARSH BUILDCON', 'Payment In-Progress', '498309']
+    ['4', 'Odisha', 'Construction of public libraries and reading rooms', 'WS/MP300/2025-2026/160836', 'KHORDHA(DISTRICT COLLECTOR KHORDHA_IDA)', 'Smt Aparajita Sarangi', 'BHUBANESWAR', '17-Sep-2026', 'MEMBER SECY OB AND OC WWB BBSR', 'Payment In-Progress', '5000']
+    ['5', 'Odisha', 'Construction of public libraries and reading rooms', 'WS/MP300/2025-2026/199511', 'KHORDHA(DISTRICT COLLECTOR KHORDHA_IDA)', 'Smt Aparajita Sarangi', 'BHUBANESWAR', '08-Sep-2026', 'MEMBER SECY OB AND OC WWB BBSR', 'Payment In-Progress', '6608']
+    ['6', 'Odisha', 'Construction of community centers and community halls', 'WS/MP18150/2025-2026/273406', 'SAMBALPUR(DISTRICT COLLECTOR SAMBALPUR_IDA)', 'DHARMENDRA PRADHAN', 'SAMBALPUR', '05-Sep-2026', 'MEMBER SECY OB AND OC WWB BBSR', 'Payment In-Progress', '4123']
+====================================================================================================
+FILE: Works Completed.xlsx
+SIZE_MIB: 27.32
+SHEETS: 1
+  SHEET: Sheet1
+  TARGET: xl/worksheets/sheet1.xml
+  DIMENSION: None
+  ROWS_CAPTURED: 8
+  FIRST_ROWS:
+    ['Works Completed']
+    ['Sr. No.', 'Work Category', 'Work', 'State', 'IDA', 'Work Description', "Hon'ble Members of Parliament", 'Constituency', 'Image', 'Completion Date', 'Amount Disbursed ( ₹ )']
+    ['1', 'Normal/Others', 'WS/MP418/2024-2025/133409-Construction of roads, link roads, pathways or any other road with or without drainage system', 'Bihar', 'ARARIA(DISTRICT PLANNING OFFICER ARARIA_IDA)', 'PCC Road from Permeshwar Bhagat house to Ramdev Master house at ward no 15, uder Forbesganj Block.', 'Pradeep Kumar Singh', 'ARARIA', 'N/A', '05-Sep-2024', '448127']
+    ['2', 'Normal/Others', 'WS/MP18152/2024-2025/133691-Construction of rooms and halls in school and colleges', 'Punjab', 'FARIDKOT(DEPUTY COMMISSIONER FARIDKOT_IDA)', 'Construction of MID DAY Meal Shed in Govt Primary school Bajakhana (Bus adda)', 'SARABJEET SINGH KHALSA', 'FARIDKOT(SC)', 'N/A', '07-Apr-2025', '300000']
+    ['3', 'Normal/Others', 'WS/MP345/2024-2025/134140-Construction of roads, link roads, pathways or any other road with or without drainage system', 'Kerala', 'KOLLAM(DISTRICT COLLECTOR KOLLAM_IDA)', 'Concreting of road from Janathavayanasala -  Panthaplavil, ward no.6  Thrikkaruva GP, in  Kollam Constituency', 'Shri NK Premachandran', 'KOLLAM', 'N/A', '12-Aug-2024', '293492']
+    ['4', 'Normal/Others', 'WS/MP18152/2024-2025/133686-Construction of rooms and halls in school and colleges', 'Punjab', 'FARIDKOT(DEPUTY COMMISSIONER FARIDKOT_IDA)', 'Construction of MID DAY Meal Shed in Govt Primary school bajakhana main', 'SARABJEET SINGH KHALSA', 'FARIDKOT(SC)', 'N/A', '07-Apr-2025', '300000']
+    ['5', 'Normal/Others', 'WS/MP18152/2024-2025/133690-Construction of rooms and halls in school and colleges', 'Punjab', 'FARIDKOT(DEPUTY COMMISSIONER FARIDKOT_IDA)', 'Construction of MID DAY Meal Shed in Govt Primary school Dal Singh Wala', 'SARABJEET SINGH KHALSA', 'FARIDKOT(SC)', 'N/A', '07-Apr-2025', '300000']
+    ['6', 'Normal/Others', 'WS/MP18152/2024-2025/133689-Construction of rooms and halls in school and colleges', 'Punjab', 'FARIDKOT(DEPUTY COMMISSIONER FARIDKOT_IDA)', 'Construction of MID DAY Meal Shed in Govt Primary school Rauwala', 'SARABJEET SINGH KHALSA', 'FARIDKOT(SC)', 'N/A', '07-Apr-2025', '300000']
+====================================================================================================
+FILE: Works Recommended.xlsx
+SIZE_MIB: 85.08
+SHEETS: 1
+  SHEET: Sheet1
+  TARGET: xl/worksheets/sheet1.xml
+  DIMENSION: None
+  ROWS_CAPTURED: 8
+  FIRST_ROWS:
+    ['Works Recommended']
+    ['Sr. No.', 'Work category', 'WORK', 'State', 'IDA', "Hon'ble Members of Parliament", 'Constituency', 'Work description', 'Recommended date', 'RECOMMENDED AMOUNT   ( ₹ )', 'Sanction Date']
+    ['1', 'Normal/Others', 'WS/ MP620/2024-2025/133166-Construction of buildings for community cultural activities', 'Karnataka', 'DHARWAD(DEPUTY COMMISSIONER DHARWAR_IDA)', 'Pralhad Venkatesh Joshi', 'DHARWAD', 'Construction of Community Bhavan at Navalgund TQ Belavatagi Village Pry No 1/A Near Shivanand Math Continue Work', '08-Jul-2024', '497185', '09-Jul-2024']
+    ['2', 'Trust and Society', 'WS/ MP620/2025-2026/133167-Construction of rooms and halls in school and colleges', 'Karnataka', 'DHARWAD(DEPUTY COMMISSIONER DHARWAR_IDA)', 'Pralhad Venkatesh Joshi', 'DHARWAD', 'Construction of College room of  CBS Charitable Foudation at Nulvi Vilage Pry No 817/3 Continued work', '08-Jul-2024', '500000', '18-Sep-2025']
+    ['3', 'Trust and Society', 'WS/ MP620/2024-2025/133190-Construction of buildings for community cultural activities', 'Karnataka', 'DHARWAD(DEPUTY COMMISSIONER DHARWAR_IDA)', 'Pralhad Venkatesh Joshi', 'DHARWAD', 'Construction of Community Bhavan of Veerashaiv Jangam Society (R) at Ward No 21 Chidamarnagar Dharwad', '08-Jul-2024', '450000', '23-Sep-2024']
+    ['4', 'Normal/Others', 'WS/ MP620/2025-2026/133191-Construction of buildings for community cultural activities', 'Karnataka', 'HAVERI(DEPUTY COMMISSIONER HAVERI_IDA)', 'Pralhad Venkatesh Joshi', 'DHARWAD', 'Construction of Maremma Cultural bhavan at Neerlgudda village Shiggava TQ', '08-Jul-2024', '1500000', '29-May-2025']
+    ['5', 'Normal/Others', 'WS/ MP620/2024-2025/133301-Construction of buildings for community cultural activities', 'Karnataka', 'DHARWAD(DEPUTY COMMISSIONER DHARWAR_IDA)', 'Pralhad Venkatesh Joshi', 'DHARWAD', 'Construction of Cultural Bhavan at Kundagol TQ, Chickgungal Village ST Colony, Pry No.202', '09-Jul-2024', '398009', '22-Aug-2024']
+    ['6', 'Normal/Others', 'WS/ MP620/2024-2025/133303-Construction of buildings for community cultural activities', 'Karnataka', 'DHARWAD(DEPUTY COMMISSIONER DHARWAR_IDA)', 'Pralhad Venkatesh Joshi', 'DHARWAD', 'Construction of Community Hall at Uppinbetageri Village Near Mallikarjun Temple Pry No1151', '09-Jul-2024', '399104', '25-Jul-2024']
+====================================================================================================
+FILE: Works Sanctioned.xlsx
+SIZE_MIB: 69.59
+SHEETS: 1
+  SHEET: Sheet1
+  TARGET: xl/worksheets/sheet1.xml
+  DIMENSION: None
+  ROWS_CAPTURED: 8
+  FIRST_ROWS:
+    ['Works Sanctioned']
+    ['Sr. No.', 'Work category', 'Work', 'State', 'IDA', "Hon'ble Members of Parliament", 'Constituency', 'Work description', 'Recommended date', 'Sanction Date', 'Sanction Amount ( ₹ )', 'Work Status']
+    ['1', 'Normal/Others', 'WS/ MP620/2024-2025/133166-Construction of buildings for community cultural activities', 'Karnataka', 'DHARWAD(DEPUTY COMMISSIONER DHARWAR_IDA)', 'Pralhad Venkatesh Joshi', 'DHARWAD', 'Construction of Community Bhavan at Navalgund TQ Belavatagi Village Pry No 1/A Near Shivanand Math Continue Work', '08-Jul-2024', '09-Jul-2024', '497185', 'Physical Inspection']
+    ['2', 'Trust and Society', 'WS/ MP620/2025-2026/133167-Construction of rooms and halls in school and colleges', 'Karnataka', 'DHARWAD(DEPUTY COMMISSIONER DHARWAR_IDA)', 'Pralhad Venkatesh Joshi', 'DHARWAD', 'Construction of College room of  CBS Charitable Foudation at Nulvi Vilage Pry No 817/3 Continued work', '08-Jul-2024', '18-Sep-2025', '500000', 'Sanction']
+    ['3', 'Trust and Society', 'WS/ MP620/2024-2025/133190-Construction of buildings for community cultural activities', 'Karnataka', 'DHARWAD(DEPUTY COMMISSIONER DHARWAR_IDA)', 'Pralhad Venkatesh Joshi', 'DHARWAD', 'Construction of Community Bhavan of Veerashaiv Jangam Society (R) at Ward No 21 Chidamarnagar Dharwad', '08-Jul-2024', '23-Sep-2024', '450000', 'Sanction']
+    ['4', 'Normal/Others', 'WS/ MP620/2025-2026/133191-Construction of buildings for community cultural activities', 'Karnataka', 'HAVERI(DEPUTY COMMISSIONER HAVERI_IDA)', 'Pralhad Venkatesh Joshi', 'DHARWAD', 'Construction of Maremma Cultural bhavan at Neerlgudda village Shiggava TQ', '08-Jul-2024', '29-May-2025', '1500000', 'Work partially Completed']
+    ['5', 'Normal/Others', 'WS/ MP620/2024-2025/133301-Construction of buildings for community cultural activities', 'Karnataka', 'DHARWAD(DEPUTY COMMISSIONER DHARWAR_IDA)', 'Pralhad Venkatesh Joshi', 'DHARWAD', 'Construction of Cultural Bhavan at Kundagol TQ, Chickgungal Village ST Colony, Pry No.202', '09-Jul-2024', '22-Aug-2024', '398009', 'Physical Inspection']
+    ['6', 'Normal/Others', 'WS/ MP620/2024-2025/133303-Construction of buildings for community cultural activities', 'Karnataka', 'DHARWAD(DEPUTY COMMISSIONER DHARWAR_IDA)', 'Pralhad Venkatesh Joshi', 'DHARWAD', 'Construction of Community Hall at Uppinbetageri Village Near Mallikarjun Temple Pry No1151', '09-Jul-2024', '25-Jul-2024', '399104', 'Physical Inspection']
