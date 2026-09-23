@@ -20,7 +20,7 @@ class RunInfo:
     finished_utc: str = ""
     elapsed_seconds: float = 0.0
     python: str = ""
-    openpyxl: str = ""
+    xlsx_reader: str = ""
     platform: str = ""
     as_of: dt.date | None = None
     limit_rows: int | None = None
@@ -177,7 +177,7 @@ class PipelineStats:
                 "finished_utc": self.run.finished_utc,
                 "elapsed_seconds": round(self.run.elapsed_seconds, 1),
                 "python": self.run.python,
-                "openpyxl": self.run.openpyxl,
+                "xlsx_reader": self.run.xlsx_reader,
                 "platform": self.run.platform,
                 "as_of": self.run.as_of.isoformat() if self.run.as_of else None,
                 "limit_rows": self.run.limit_rows,

@@ -29,8 +29,6 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-import openpyxl
-
 from data_pipeline import staging
 from data_pipeline.aggregate import AGG_COLUMNS, write_expenditure_by_work
 from data_pipeline.demo import write_demo
@@ -161,7 +159,7 @@ def _run(cfg: PipelineConfig) -> PipelineStats:
     run = stats.run
     run.started_utc = _utc_now()
     run.python = platform.python_version()
-    run.openpyxl = openpyxl.__version__
+    run.xlsx_reader = "standard library (zipfile + xml.etree streaming; styles ignored)"
     run.platform = platform.platform()
     run.as_of = cfg.as_of
     run.limit_rows = cfg.limit_rows

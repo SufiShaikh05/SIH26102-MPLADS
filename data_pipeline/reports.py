@@ -143,6 +143,12 @@ def headline_findings(stats: PipelineStats) -> list[str]:
                 f"**Possible truncation** - {_title(key)} reached Excel's {fmt(EXCEL_MAX_ROWS)}-row sheet limit; "
                 "the export may have been cut off."
             )
+    for key, p in stats.profiles.items():
+        if p.layout and p.layout.date1904:
+            lines.append(
+                f"**1904 date system** - {_title(key)}: the workbook uses Excel's 1904 date system, so any numeric "
+                "(serial-number) dates would be read 4 years off; text dates such as 08-Jul-2024 are unaffected."
+            )
     invalid = _sum_over(stats, "invalid")
     for key, n in invalid.items():
         if n:
@@ -172,7 +178,8 @@ def _section_run(stats: PipelineStats, out: list[str]) -> None:
         ["Elapsed", f"{r.elapsed_seconds:,.0f} s"],
         ["As-of date for future-date checks", r.as_of],
         ["Earliest plausible date", f"{MPLADS_START.isoformat()} (MPLADS launch; assumption)"],
-        ["Python / openpyxl", f"{r.python} / {r.openpyxl}"],
+        ["Python", r.python],
+        ["XLSX reader", r.xlsx_reader],
         ["Platform", r.platform],
         ["Raw workbooks unchanged (SHA-256 before == after)", {True: "yes", False: "NO - investigate", None: "not checked"}[r.raw_unchanged]],
         ["Row limit (`--limit-rows`)", r.limit_rows if r.limit_rows else "none (full run)"],
@@ -355,8 +362,8 @@ def _column_tables(stats: PipelineStats, out: list[str]) -> None:
                  ", ".join(f"{k}={fmt(v)}" for k, v in c.notes.items() if not k.startswith("invalid")) or "-"] for c in amounts])
         dates = [c for c in cols if c.kind == "date"]
         if dates:
-            out += table(["Date column", "Valid", "Earliest", "Latest", f"Before {MPLADS_START}", f"After {stats.run.as_of}", "Non-standard format"], [
-                [c.name, fmt(c.n_dates), c.min_date or "-", c.max_date or "-", fmt(c.too_early), fmt(c.too_late), fmt(c.notes["alt_format"])] for c in dates])
+            out += table(["Date column", "Valid", "Earliest", "Latest", f"Before {MPLADS_START}", f"After {stats.run.as_of}", "Non-standard text format", "From Excel serial number"], [
+                [c.name, fmt(c.n_dates), c.min_date or "-", c.max_date or "-", fmt(c.too_early), fmt(c.too_late), fmt(c.notes["alt_format"]), fmt(c.notes["excel_serial"])] for c in dates])
         for c in cols:
             for kind, items in c.examples.items():
                 out.append(f"- `{c.name}` {kind.replace('_', ' ')} examples (source row: value): " + "; ".join(f"{r}: `{trunc(v, 40)}`" for r, v in items[:5]))
@@ -474,7 +481,7 @@ def _section_outputs(stats: PipelineStats, out: list[str]) -> None:
 ASSUMPTIONS = """## 14. Assumptions and limitations
 
 * Only columns seen in the data spike are read. Headers are matched ignoring case, spacing and punctuation; a missing required column stops the run with an explicit error.
-* Values are read as stored in the workbook (cached values, not formulas). Text keeps its original case; only whitespace is normalised. `N/A`, `-`, `null` and similar placeholders are treated as missing.
+* Workbooks are read with a standard-library ZIP/XML streaming reader that ignores Excel styles and number formats. Values are read as stored (cached values, not formulas). Text keeps its original case; only whitespace is normalised. `N/A`, `-`, `null` and similar placeholders are treated as missing. A numeric cell in a date column is treated as an Excel serial number (1900 date system) and counted separately in section 8.
 * Dates: `DD-Mon-YYYY` is the observed format. Other formats are accepted and counted as *non-standard*; numeric `dd/mm/yyyy` is read day-first. Impossible calendar dates are invalid, not guessed.
 * Amounts: read as exact decimals; commas (Western or Indian grouping), currency symbols and accounting brackets are tolerated. Negative values are kept and counted. Values of 10^15 rupees or more, or with more than 12 decimal places, are treated as invalid (guard against corrupt cells).
 * Only the first sheet that contains the expected header is read; any other sheet in a workbook is listed in section 3 and in the headline findings.

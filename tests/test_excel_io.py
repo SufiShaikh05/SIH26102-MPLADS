@@ -73,7 +73,7 @@ def _rewrite_sheet_xml(source, target, transform):
 
 @pytest.mark.parametrize("dimension", ['<dimension ref="A1"/>', ""], ids=["wrong dimension", "no dimension"])
 def test_wrong_or_missing_sheet_dimension_does_not_truncate_columns(tmp_path, dimension):
-    """The spike found workbooks without a <dimension>; a wrong one would make read-only mode drop columns."""
+    """The spike found workbooks without a <dimension>; a wrong one made openpyxl truncate. This reader ignores it."""
     rows = [["1", "c", "WS/MP1/2024-2025/1-x", "s", "i", "m", "k", "d", "01-Jan-2024", "1", "02-Jan-2024"]]
     original = write_workbook(tmp_path / "orig.xlsx", "Works Recommended", HEADERS["recommended"], rows)
     patched = tmp_path / "patched.xlsx"
@@ -95,17 +95,6 @@ def test_reader_never_modifies_the_workbook(tmp_path):
     before = file_fingerprint(path)
     read_all(RECOMMENDED, path)
     assert file_fingerprint(path)["sha256"] == before["sha256"]
-
-
-def test_openpyxl_hook_used_for_speed_is_restored_after_opening(tmp_path):
-    try:
-        from openpyxl.worksheet._read_only import ReadOnlyWorksheet
-    except ImportError:  # other openpyxl layout: the optimisation is simply skipped
-        return
-    original = ReadOnlyWorksheet._get_size
-    path = write_workbook(tmp_path / "r.xlsx", "Works Recommended", HEADERS["recommended"], [])
-    read_all(RECOMMENDED, path)
-    assert ReadOnlyWorksheet._get_size is original
 
 
 def test_additional_sheets_are_reported_because_they_are_not_read(tmp_path):

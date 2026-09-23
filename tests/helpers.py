@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import csv
 import datetime as dt
+import re
+import zipfile
 from pathlib import Path
 
 from openpyxl import Workbook
@@ -168,3 +170,22 @@ def build_raw_dir(directory: Path) -> Path:
 def read_csv(path: Path) -> list[dict[str, str]]:
     with open(path, newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def poison_styles(source: Path, target: Path, fills: str = '<fills count="2"><fill/><fill/></fills>') -> Path:
+    """Copy a workbook, replacing the ``<fills>`` block of ``xl/styles.xml`` with one some libraries cannot parse.
+
+    Only the styles part changes; every worksheet part is copied byte for byte.  With the default block
+    openpyxl fails with ``TypeError: Fill() takes no arguments`` (verified with openpyxl 3.1.5).
+    """
+    target.parent.mkdir(parents=True, exist_ok=True)
+    replaced = 0
+    with zipfile.ZipFile(source) as zin, zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename == "xl/styles.xml":
+                text, replaced = re.subn(r"<fills\b.*?</fills>", fills, data.decode("utf-8"), flags=re.S)
+                data = text.encode("utf-8")
+            zout.writestr(item, data)
+    assert replaced == 1, "expected exactly one <fills> block in xl/styles.xml"
+    return target

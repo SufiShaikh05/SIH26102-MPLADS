@@ -27,3 +27,6 @@ venv/
 # OS
 Thumbs.db
 .DS_Store
+
+# Generated smoke-test output
+.smoke/
