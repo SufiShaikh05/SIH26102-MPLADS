@@ -35,7 +35,9 @@ from data_pipeline.demo import write_demo
 from data_pipeline.excel_io import SchemaError, file_fingerprint
 from data_pipeline.ingest import (
     MALFORMED_COLUMNS,
+    SUMMARY_COLUMNS,
     TXN_COLUMNS,
+    UNKEYED_COLUMNS,
     IngestContext,
     ingest_expenditure,
     ingest_reference,
@@ -193,6 +195,8 @@ def _run(cfg: PipelineConfig) -> PipelineStats:
         "allocation": CsvSink(processed / "mp_allocated_limits.csv", ["source_row", *SOURCES["allocation"].stored_columns, "duplicate_record"]),
         "calamity": CsvSink(processed / "calamity_consents.csv", ["source_row", *SOURCES["calamity"].stored_columns, "duplicate_record"]),
         "malformed": CsvSink(processed / "malformed_ids.csv", MALFORMED_COLUMNS),
+        "unkeyed": CsvSink(processed / "unkeyed_recommendations.csv", UNKEYED_COLUMNS),
+        "summary": CsvSink(processed / "summary_rows.csv", SUMMARY_COLUMNS),
         "duplicates": CsvSink(processed / "work_id_duplicates.csv", DUPLICATE_COLUMNS),
         "conflicts": CsvSink(processed / "work_conflicts.csv", CONFLICT_COLUMNS),
         "unmatched": CsvSink(processed / "join_unmatched_ids.csv", UNMATCHED_COLUMNS),
@@ -201,8 +205,8 @@ def _run(cfg: PipelineConfig) -> PipelineStats:
     conn = staging.connect(staging_path)
     try:
         ctx = IngestContext(
-            lo=MPLADS_START, hi=cfg.as_of, limit_rows=cfg.limit_rows,
-            progress_every=cfg.progress_every, malformed=sinks["malformed"],
+            lo=MPLADS_START, hi=cfg.as_of, limit_rows=cfg.limit_rows, progress_every=cfg.progress_every,
+            malformed=sinks["malformed"], summary=sinks["summary"], unkeyed=sinks["unkeyed"], stats=stats,
         )
         for key in WORK_SOURCES:
             log.info("Reading %s", SOURCES[key].file_name)
@@ -215,7 +219,7 @@ def _run(cfg: PipelineConfig) -> PipelineStats:
         write_expenditure_by_work(conn, sinks["by_work"], stats.expenditure)
         for key in ("allocation", "calamity"):
             log.info("Reading %s", SOURCES[key].file_name)
-            ingest_reference(SOURCES[key], raw_paths[key], profiles[key], ctx, sinks[key])
+            ingest_reference(SOURCES[key], raw_paths[key], conn, profiles[key], ctx, sinks[key])
         mark("aggregate + reference data")
         log.info("Merging works and analysing joins")
         demo_ids = build_master(
@@ -235,6 +239,7 @@ def _run(cfg: PipelineConfig) -> PipelineStats:
 
     stats.outputs = {sink.profile.name: sink.profile for sink in sinks.values()}
     stats.malformed_logged = sinks["malformed"].rows
+    stats.unkeyed_logged = sinks["unkeyed"].rows
     if cfg.demo_size > 0:
         log.info("Writing demo subset (%s works)", len(demo_ids))
         stats.demo = write_demo(processed, cfg.demo_dir, demo_ids, seed=cfg.demo_seed, size=cfg.demo_size)

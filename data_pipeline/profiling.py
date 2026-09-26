@@ -144,21 +144,31 @@ class ColumnProfile:
 
 
 class IdProfile:
-    """Work ID parsing outcomes for one source."""
+    """Work ID parsing outcomes for one source.
+
+    ``malformed`` counts genuinely unparseable values only.  A value that fails to parse
+    but reads as the ``NA-...`` unkeyed-recommendation convention (see
+    :func:`data_pipeline.work_id.is_unkeyed_na`) is counted in ``na_unkeyed`` instead, kept
+    entirely separate so the report never conflates "we could not read this ID" with "this
+    work legitimately has none yet". Rows judged to be summary/footer rows never reach
+    :meth:`observe` at all - they are counted by :class:`~data_pipeline.stats.SummaryRowStats`.
+    """
 
     def __init__(self) -> None:
         self.total = 0
         self.valid = 0
         self.malformed = 0
+        self.na_unkeyed = 0
         self.with_warnings = 0
         self.reasons: Counter[str] = Counter()
         self.warnings: Counter[str] = Counter()
         self.prefixes: Counter[str] = Counter()
         self.financial_years: Counter[str] = Counter()
         self.mp_codes: set[str] = set()
-        self.examples: list[tuple[int, str, str, str]] = []  # (row, raw, reason, detail)
+        self.examples: list[tuple[int, str, str, str]] = []  # (row, raw, reason, detail) - malformed only
+        self.na_examples: list[tuple[int, str]] = []          # (row, raw) - na_unkeyed only
 
-    def observe(self, row_no: int, raw: object, parsed: WorkIdParse) -> None:
+    def observe(self, row_no: int, raw: object, parsed: WorkIdParse, *, na_unkeyed: bool = False) -> None:
         self.total += 1
         if parsed.ok:
             self.valid += 1
@@ -168,6 +178,10 @@ class IdProfile:
             if parsed.warnings:
                 self.with_warnings += 1
                 self.warnings.update(parsed.warnings)
+        elif na_unkeyed:
+            self.na_unkeyed += 1
+            if len(self.na_examples) < 20:
+                self.na_examples.append((row_no, str(raw)[:120]))
         else:
             self.malformed += 1
             self.reasons[parsed.error or "unknown"] += 1
@@ -191,6 +205,7 @@ class SourceProfile:
         self.limit_hit = False
         self.exact_duplicate_rows = 0
         self.duplicate_examples: list[int] = []   # source rows of repeated records
+        self.summary_rows_excluded = 0            # footer/summary rows found for this source (cheap + aggregate)
         self.distinct_ids = 0                     # unique valid Work IDs (keyed sources)
         self.layout = None                        # SheetLayout, set by the reader
         self.fingerprint: dict[str, object] = {}

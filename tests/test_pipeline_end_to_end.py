@@ -121,14 +121,19 @@ def test_expenditure_by_work_aggregates(pipeline):
     agg = by_id(read_csv(pipeline.processed / "expenditure_by_work.csv"))
     assert list(agg) == [W1, W3, ORPHAN]
     assert agg[W1] == {
-        "work_id": W1, "total_disbursed": "350000", "payment_count": "4",
+        "work_id": W1,
+        "total_disbursed_all_rows": "350000", "total_disbursed": "350000",   # alias, same value
+        "success_amount": "0", "in_progress_amount": "0",                    # fixture uses "Paid", not "Payment Success"
+        "exact_duplicate_amount": "100000", "deduplicated_disbursed_amount": "250000",
+        "payment_count_all_rows": "4", "payment_count": "4",                 # alias, same value
+        "deduplicated_payment_count": "3", "duplicate_record_count": "1", "duplicate_ratio": "0.25",
         "first_expenditure_date": "2024-08-01", "last_expenditure_date": "2024-09-01",
         "vendor_count": "2",                      # "ABC Infra" and "abc  infra" fold to one vendor
         "amount_missing_count": "1", "date_missing_count": "0", "negative_amount_count": "0",
-        "duplicate_record_count": "1",
     }
-    assert agg[W3]["total_disbursed"] == "400000" and agg[W3]["payment_count"] == "1"
-    assert agg[ORPHAN]["total_disbursed"] == "-500" and agg[ORPHAN]["negative_amount_count"] == "1"
+    assert agg[W3]["total_disbursed_all_rows"] == "400000" and agg[W3]["payment_count_all_rows"] == "1"
+    assert agg[W3]["duplicate_ratio"] == "0" and agg[W3]["deduplicated_payment_count"] == "1"
+    assert agg[ORPHAN]["total_disbursed_all_rows"] == "-500" and agg[ORPHAN]["negative_amount_count"] == "1"
 
 
 def test_join_analysis_counts(pipeline):
@@ -176,8 +181,8 @@ def test_reports_contain_real_figures_and_no_placeholders(pipeline):
     dictionary = (pipeline.docs / "DATA_DICTIONARY.md").read_text(encoding="utf-8")
     for text in (quality, dictionary):
         assert "TBD" not in text and "PARTIAL RUN" not in text
-    for heading in ("## 4. Work ID extraction", "## 5. Duplicates", "## 6. Join analysis", "## 7. Conflicting values",
-                    "## 8. Column-level quality", "## 10. Date / amount relationships"):
+    for heading in ("## 4. Work ID extraction", "## 5. Summary/footer rows excluded", "## 6. Duplicates", "## 7. Join analysis",
+                    "## 8. Conflicting values", "## 9. Column-level quality", "## 11. Date / amount relationships"):
         assert heading in quality
     assert "wrong_segment_count" in quality and "sanctioned_not_in_recommended" in quality
     assert "Raw workbooks unchanged (SHA-256 before == after) | yes" in quality

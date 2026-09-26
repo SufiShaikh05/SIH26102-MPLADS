@@ -151,3 +151,24 @@ def normalize_work_id(value: object) -> str | None:
 
 def is_canonical_work_id(value: object) -> bool:
     return isinstance(value, str) and CANONICAL_RE.fullmatch(value) is not None
+
+
+_NA_PREFIX_RE = re.compile(r"^NA\b", re.IGNORECASE)
+
+
+def is_unkeyed_na(raw: object) -> bool:
+    """True for a Work cell that reads as the ``NA-...`` unkeyed-recommendation convention.
+
+    Some recommended works have not yet been assigned an official Work ID and the source
+    marks the ``Work`` cell with ``NA`` instead - alone, or followed by a separator and the
+    usual description (``NA-Construction of...``). That is a distinct, legitimate record
+    category, not a data-quality defect and not a footer row: it is recognised by prefix
+    only, so callers should check this *after* :func:`parse_work_id` has already failed on
+    the same raw value, never as a substitute for parsing.  ``\\bNA\\b`` deliberately does
+    not match "NATIONAL", "NAME" or a real prefix such as "NAC" that happens to start the
+    same way.
+    """
+    if not isinstance(raw, str):
+        return False
+    text = " ".join(raw.split())
+    return bool(_NA_PREFIX_RE.match(text))

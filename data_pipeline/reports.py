@@ -88,6 +88,22 @@ def _sum_over(stats: PipelineStats, attr: str, kinds: tuple[str, ...] | None = N
 # ------------------------------------------------------------------------ quality report
 def headline_findings(stats: PipelineStats) -> list[str]:
     lines: list[str] = []
+    s = stats.summary_rows
+    for source, reason in sorted(s.counts):
+        count, amount = s.counts[(source, reason)], s.amount[(source, reason)]
+        amount_text = f"; \u20b9{amount:,.2f} involved" if amount else ""
+        lines.append(
+            f"**Summary/footer row excluded** - {_title(source)}: {fmt(count)} row(s) ({reason}) removed from every "
+            f"analytical output{amount_text}; full detail in `summary_rows.csv` (section 5). This is a different "
+            "thing from a malformed Work ID, below."
+        )
+    u = stats.unkeyed
+    for source, count in sorted(u.by_source.items()):
+        lines.append(
+            f"**Unkeyed recommendations** - {_title(source)}: {fmt(count)} row(s) read as the `NA-...` convention "
+            "(no Work ID assigned yet, a legitimate record); logged in `unkeyed_recommendations.csv` (section 4.1), "
+            "kept out of both `malformed_ids.csv` and `summary_rows.csv`."
+        )
     for key in (*WORK_SOURCES, "expenditure"):
         p = stats.profiles[key]
         if p.id.malformed:
@@ -231,22 +247,28 @@ def _section_work_ids(stats: PipelineStats, out: list[str]) -> None:
     out.append(
         "Canonical form: `PREFIX/MPCODE/YYYY-YYYY/SERIAL` (upper-case, spaces removed). The ID is taken from the "
         "start of the `Work` cell (Recommended, Sanctioned, Completed) or from the `Work ID` column (Expenditure). "
-        "Sr. No. is never used. Malformed values are logged to `data/processed/malformed_ids.csv`.\n"
+        "Sr. No. is never used. Genuinely unparseable values are logged to `data/processed/malformed_ids.csv`. Two "
+        "other row categories can also fail to parse here without being a data-quality defect: a summary/footer row "
+        "(section 5) is judged and removed *before* its Work ID is ever looked at, and a Recommended row using the "
+        "`NA-...` unkeyed convention (below) is logged to its own file - neither counts toward 'Malformed' here.\n"
     )
     keys = (*WORK_SOURCES, "expenditure")
     rows = []
     for key in keys:
         p = stats.profiles[key]
         rows.append([
-            _title(key), fmt(p.id.total), fmt(p.id.valid), fmt(p.id.malformed), pct(p.id.valid, p.id.total),
-            fmt(p.id.with_warnings), fmt(p.distinct_ids if key != "expenditure" else stats.join.unique["E"]),
-            fmt(len(p.id.mp_codes)),
+            _title(key), fmt(p.id.total), fmt(p.id.valid), fmt(p.id.malformed), fmt(p.id.na_unkeyed),
+            pct(p.id.valid, p.id.total), fmt(p.id.with_warnings),
+            fmt(p.distinct_ids if key != "expenditure" else stats.join.unique["E"]), fmt(len(p.id.mp_codes)),
         ])
-    out += table(["Source", "Rows", "Valid IDs", "Malformed", "Valid %", "Valid but normalised", "Unique valid IDs", "Distinct MP codes"], rows)
+    out += table(
+        ["Source", "Rows", "Valid IDs", "Malformed", "NA-unkeyed", "Valid %", "Valid but normalised", "Unique valid IDs", "Distinct MP codes"],
+        rows,
+    )
 
     reasons = [r for r in ERROR_CODES if any(stats.profiles[k].id.reasons[r] for k in keys)]
     if reasons:
-        out.append("Malformed reasons:\n")
+        out.append("Malformed reasons (NA-unkeyed and summary/footer rows excluded from these counts):\n")
         out += table(["Reason", *[_title(k) for k in keys]], [[r, *[fmt(stats.profiles[k].id.reasons[r]) for k in keys]] for r in reasons])
     warning_names = sorted({w for k in keys for w in stats.profiles[k].id.warnings})
     if warning_names:
@@ -264,11 +286,53 @@ def _section_work_ids(stats: PipelineStats, out: list[str]) -> None:
         out.append("First malformed examples (full list in `malformed_ids.csv`):\n")
         out += table(["Source", "Row", "Raw value", "Reason", "Detail"], [[k, r, trunc(raw, 80), reason, trunc(detail, 60)] for k, r, raw, reason, detail in examples[:20]])
 
+    out.append("### 4.1 Unkeyed / NA recommendations (not malformed)\n")
+    out.append(
+        "A Recommended row whose Work cell reads as the `NA-...` convention (starts with `NA` before any `/`-structure "
+        "is expected) has simply not been assigned a Work ID yet - a normal, legitimate record, not a parsing failure "
+        "and not a footer row. It is excluded from `malformed_ids.csv`, kept out of `works_master.csv` (there is no ID "
+        "to join on), and logged in full to `data/processed/unkeyed_recommendations.csv`.\n"
+    )
+    u = stats.unkeyed
+    if u.total:
+        out += table(["Source", "Count"], [[_title(s), fmt(n)] for s, n in sorted(u.by_source.items())])
+        out.append("First examples (full list in `unkeyed_recommendations.csv`):\n")
+        out += table(["Row"], [[r] for r in u.rows.get("recommended", [])[:10]])
+    else:
+        out.append("None found.\n")
+
+
+def _section_summary_rows(stats: PipelineStats, out: list[str]) -> None:
+    out.append("## 5. Summary/footer rows excluded\n")
+    out.append(
+        "Government exports often carry a trailing Total/Grand Total row that was never meant to be a data record. "
+        "Rows below were judged on their own content - a total-like label, a number sitting in a field that should "
+        "never be numeric, an aggregate value with no identity fields, or an amount that exactly equals the sum of "
+        "every other row in its column - and were removed from every analytical output before they could reach it: "
+        "they never contribute to a master row, a transaction, an aggregate, or a reference-table total, and they "
+        "are never counted as a malformed Work ID. Full detail for every row is in `data/processed/summary_rows.csv`; "
+        "reason codes are defined in `data_pipeline/footer_detection.py`.\n"
+    )
+    s = stats.summary_rows
+    if not s.total:
+        out.append("None found.\n")
+        return
+    rows = []
+    for source, reason in sorted(s.counts):
+        amount = s.amount[(source, reason)]
+        sample = s.rows[(source, reason)]
+        row_text = ", ".join(map(str, sample))
+        if s.counts[(source, reason)] > len(sample):
+            row_text += f", +{s.counts[(source, reason)] - len(sample)} more"
+        rows.append([_title(source), reason, fmt(s.counts[(source, reason)]), money(amount) if amount else "-", row_text])
+    out += table(["Source", "Reason", "Count", "Amount involved (\u20b9)", "Source rows"], rows)
+    out.append(f"Total excluded across all sources: **{fmt(s.total)}**\n")
+
 
 def _section_duplicates(stats: PipelineStats, out: list[str]) -> None:
-    out.append("## 5. Duplicates\n")
+    out.append("## 6. Duplicates\n")
     d = stats.duplicates
-    out.append("### 5.1 Repeated Work IDs inside one source\n")
+    out.append("### 6.1 Repeated Work IDs inside one source\n")
     out.append("Policy: the first row (lowest source row) is kept; every repeat is written to `work_id_duplicates.csv` as `identical` or `conflicting`.\n")
     rows = []
     for key in WORK_SOURCES:
@@ -280,12 +344,12 @@ def _section_duplicates(stats: PipelineStats, out: list[str]) -> None:
         if d.samples[key]:
             out.append(f"Conflicting repeats in {_title(key)} (first {len(d.samples[key])}):\n")
             out += table(["Work ID", "Repeat row", "Kept row", "Differing fields"], [[s["work_id"], s["source_row"], s["kept_source_row"], s["differing_fields"]] for s in d.samples[key]])
-    out.append("### 5.2 Exact duplicate rows (Sr. No. ignored)\n")
+    out.append("### 6.2 Exact duplicate rows (Sr. No. ignored)\n")
     rows = [[_title(k), fmt(p.data_rows), fmt(p.exact_duplicate_rows), pct(p.exact_duplicate_rows, p.data_rows),
              ", ".join(map(str, p.duplicate_examples[:5])) or "-"] for k, p in stats.profiles.items()]
     out += table(["Source", "Data rows", "Repeated rows", "%", "Example source rows"], rows)
     e = stats.expenditure
-    out.append("### 5.3 Expenditure: payments per Work ID\n")
+    out.append("### 6.3 Expenditure: payments per Work ID\n")
     out.append("Several payments per work are expected; the table shows how many. `duplicate_record = 1` in `expenditure_transactions.csv` marks a payment identical to an earlier row.\n")
     out += table(["Metric", "Value"], [
         ["Works with at least one payment", fmt(e.works)],
@@ -294,11 +358,38 @@ def _section_duplicates(stats: PipelineStats, out: list[str]) -> None:
         *[[f"Works with {b} payment(s)", fmt(e.histogram[b])] for b in e.BUCKETS],
     ])
 
+    out.append("### 6.4 Expenditure: exact duplicate transactions (retained, not discarded)\n")
+    out.append(
+        "Exact duplicate transaction rows (`duplicate_record = 1`, counted in 6.2 above) are **not** removed from "
+        "`expenditure_transactions.csv`, and their amounts are **not** subtracted from `expenditure_by_work.csv`'s "
+        "main totals. The raw workbook carries no transaction identifier, so a row that is byte-for-byte identical "
+        "to an earlier one cannot be told apart from a genuine second payment - the same vendor legitimately paid "
+        "the same amount on the same date twice - from a duplicate-entry error. Exact duplication is reported here "
+        "as a data-quality signal that calls for independent verification against source records; it is not, by "
+        "itself, evidence of an error and it is never treated as evidence of fraud.\n"
+    )
+    out += table(["Metric", "Value"], [
+        ["Exact duplicate transaction rows (`duplicate_record = 1`)", fmt(e.duplicate_count_total)],
+        ["Amount attached to those rows (`exact_duplicate_amount`, summed)", money(e.duplicate_amount_total)],
+        ["Payment rows with `duplicate_record = 0`", fmt(e.deduplicated_count_total)],
+        ["Amount from those rows (`deduplicated_disbursed_amount`, summed)", money(e.deduplicated_amount_total)],
+        ["`Payment Success` amount, all rows (`success_amount`, summed)", money(e.success_total)],
+        ["`Payment In-Progress` amount, all rows (`in_progress_amount`, summed)", money(e.in_progress_total)],
+        ["All rows, every status (`total_disbursed_all_rows`, summed across every work)", money(e.total)],
+    ])
+    out.append(
+        "`expenditure_by_work.csv` carries this same breakdown per work (`success_amount`, `in_progress_amount`, "
+        "`exact_duplicate_amount`, `deduplicated_disbursed_amount`, `deduplicated_payment_count`, `duplicate_ratio`), "
+        "so a specific work's duplicates can be judged in context rather than only in aggregate. `total_disbursed` "
+        "and `payment_count` remain in that file, unchanged, as aliases of `total_disbursed_all_rows` and "
+        "`payment_count_all_rows` - existing code that reads them keeps working.\n"
+    )
+
 
 def _section_join(stats: PipelineStats, out: list[str]) -> None:
     j = stats.join
-    out.append("## 6. Join analysis (Work ID)\n")
-    out.append("### 6.1 Unique IDs per source\n")
+    out.append("## 7. Join analysis (Work ID)\n")
+    out.append("### 7.1 Unique IDs per source\n")
     rows = []
     for tag, key in (("R", "recommended"), ("S", "sanctioned"), ("C", "completed"), ("E", "expenditure")):
         p = stats.profiles[key]
@@ -306,11 +397,11 @@ def _section_join(stats: PipelineStats, out: list[str]) -> None:
     rows.append(["Union of all four sources", "", fmt(j.union_ids), ""])
     rows.append([TAG_LABELS["M"] + " = master rows", "", fmt(j.master_rows), ""])
     out += table(["Source", "Rows with valid ID", "Unique valid IDs", "Malformed IDs"], rows)
-    out.append("### 6.2 Which sources each ID appears in\n")
+    out.append("### 7.2 Which sources each ID appears in\n")
     label = lambda pattern: " + ".join(t for t, present in zip("RSCE", pattern) if present) or "(none)"  # noqa: E731
     out += table(["Present in", "Work IDs", "% of union"], [[label(p), fmt(n), pct(n, j.union_ids)] for p, n in sorted(j.patterns.items(), key=lambda kv: -kv[1])])
     out.append("R = Recommended, S = Sanctioned, C = Completed, E = Expenditure.\n")
-    out.append("### 6.3 Match rates\n")
+    out.append("### 7.3 Match rates\n")
     out.append(
         "Rows marked *check* test a relationship the recommend -> sanction -> complete -> pay flow implies; unmatched IDs "
         "are written to `join_unmatched_ids.csv` (may also reflect snapshot timing or export filters). Rows marked *coverage* "
@@ -328,7 +419,7 @@ def _section_join(stats: PipelineStats, out: list[str]) -> None:
 
 def _section_conflicts(stats: PipelineStats, out: list[str]) -> None:
     c = stats.conflicts
-    out.append("## 7. Conflicting values between sources\n")
+    out.append("## 8. Conflicting values between sources\n")
     out.append(
         "Where Recommended, Sanctioned and Completed hold different non-empty values for the same Work ID, the preferred value "
         "is used in `works_master.csv` (descriptive fields: Sanctioned > Recommended > Completed; `sanction_date`: Sanctioned first; "
@@ -348,7 +439,7 @@ def _section_conflicts(stats: PipelineStats, out: list[str]) -> None:
 
 
 def _column_tables(stats: PipelineStats, out: list[str]) -> None:
-    out.append("## 8. Column-level quality\n")
+    out.append("## 9. Column-level quality\n")
     for key, p in stats.profiles.items():
         out.append(f"### {_title(key)} (`{p.spec.file_name}`)\n")
         cols = list(p.columns.values())
@@ -371,7 +462,7 @@ def _column_tables(stats: PipelineStats, out: list[str]) -> None:
 
 
 def _categorical(stats: PipelineStats, out: list[str]) -> None:
-    out.append("## 9. Categorical consistency\n")
+    out.append("## 10. Categorical consistency\n")
     out.append("Values are grouped after folding case, spacing and punctuation; a group with more than one spelling is an inconsistency candidate. Different *spellings* of the same name (typos) are not detected.\n")
     summary = []
     details: list[str] = []
@@ -404,7 +495,7 @@ def _categorical(stats: PipelineStats, out: list[str]) -> None:
 
 
 def _section_checks(stats: PipelineStats, out: list[str]) -> None:
-    out.append("## 10. Date / amount relationships (merged works)\n")
+    out.append("## 11. Date / amount relationships (merged works)\n")
     out.append("A hit means the relationship looks impossible or unusual in the data as exported. These are review candidates - they do not establish an error and say nothing about intent.\n")
     rows = []
     for name, (group, description) in CHECK_INFO.items():
@@ -435,13 +526,19 @@ def _section_checks(stats: PipelineStats, out: list[str]) -> None:
 def _section_expenditure(stats: PipelineStats, out: list[str]) -> None:
     p = stats.profiles["expenditure"]
     amounts = p.extra.get("payment_status_amounts", {})
-    out.append("## 11. Expenditure by payment status\n")
-    out.append("`total_disbursed` in `expenditure_by_work.csv` adds up **all** statuses. Whether every status counts as money actually disbursed is not stated in the workbook - decide before using it in a detector.\n")
+    out.append("## 12. Expenditure by payment status\n")
+    out.append(
+        "`total_disbursed_all_rows` (alias: `total_disbursed`) in `expenditure_by_work.csv` adds up **all** "
+        "statuses, exact duplicates included. Whether every status counts as money actually disbursed is not "
+        "stated in the workbook - decide before using it in a detector. `success_amount` and `in_progress_amount` "
+        "single out the two statuses below by name for that reason; section 6.4 has the duplicate-amount side of "
+        "this same breakdown.\n"
+    )
     out += table(["Payment Status", "Payments", "Sum of Fund Disbursed Amount"], [[s, fmt(n), money(total)] for s, (n, total) in sorted(amounts.items(), key=lambda kv: -kv[1][0])])
 
 
 def _section_reference(stats: PipelineStats, out: list[str]) -> None:
-    out.append("## 12. Reference workbooks and MP-name linkage\n")
+    out.append("## 13. Reference workbooks and MP-name linkage\n")
     alloc, cal = stats.profiles["allocation"], stats.profiles["calamity"]
     out += table(["Workbook", "Rows", "Repeated rows", "Amount sum (rupees)"], [
         [_title("allocation"), fmt(alloc.data_rows), fmt(alloc.exact_duplicate_rows), money(alloc.columns["allocated_amount"].amount_sum)],
@@ -472,24 +569,28 @@ def _section_reference(stats: PipelineStats, out: list[str]) -> None:
 
 
 def _section_outputs(stats: PipelineStats, out: list[str]) -> None:
-    out.append("## 13. Output files\n")
+    out.append("## 14. Output files\n")
     out += table(["File", "Rows", "Columns"], [[f"{o.path.name}", fmt(o.rows), len(o.columns)] for o in stats.outputs.values()])
     if stats.demo:
         out.append("Demo subset (`data/demo/`): " + ", ".join(f"{k}: {fmt(v)} rows" for k, v in stats.demo.items()) + "\n")
 
 
-ASSUMPTIONS = """## 14. Assumptions and limitations
+ASSUMPTIONS = """## 15. Assumptions and limitations
 
 * Only columns seen in the data spike are read. Headers are matched ignoring case, spacing and punctuation; a missing required column stops the run with an explicit error.
-* Workbooks are read with a standard-library ZIP/XML streaming reader that ignores Excel styles and number formats. Values are read as stored (cached values, not formulas). Text keeps its original case; only whitespace is normalised. `N/A`, `-`, `null` and similar placeholders are treated as missing. A numeric cell in a date column is treated as an Excel serial number (1900 date system) and counted separately in section 8.
+* Workbooks are read with a standard-library ZIP/XML streaming reader that ignores Excel styles and number formats. Values are read as stored (cached values, not formulas). Text keeps its original case; only whitespace is normalised. `N/A`, `-`, `null` and similar placeholders are treated as missing. A numeric cell in a date column is treated as an Excel serial number (1900 date system) and counted separately in section 9.
 * Dates: `DD-Mon-YYYY` is the observed format. Other formats are accepted and counted as *non-standard*; numeric `dd/mm/yyyy` is read day-first. Impossible calendar dates are invalid, not guessed.
 * Amounts: read as exact decimals; commas (Western or Indian grouping), currency symbols and accounting brackets are tolerated. Negative values are kept and counted. Values of 10^15 rupees or more, or with more than 12 decimal places, are treated as invalid (guard against corrupt cells).
 * Only the first sheet that contains the expected header is read; any other sheet in a workbook is listed in section 3 and in the headline findings.
 * The plausibility window for dates (1993-12-23 to the as-of date) is an assumption used only to flag values, never to change them.
 * Work IDs must have four `/`-separated parts (prefix, MP code, `YYYY-YYYY`, numeric serial). Anything else is logged as malformed rather than repaired. A financial year that is not consecutive (e.g. 2024-2026) is accepted but counted as a quirk.
+* A Recommended row is read as the `NA-...` unkeyed convention (section 4.1) when its Work cell starts with `NA` at a word boundary; this only ever reclassifies a parse *failure* as "unkeyed" instead of "malformed" - it can never turn a row into a footer, and it can never turn a row that already parsed successfully into anything else.
+* Summary/footer rows (section 5) are judged from the row's own content before its Work ID is even looked at: a total/grand-total label in an identity-like field, a plainly numeric value sitting in a field that is never numeric (including a number in a date field that fails as a date), an aggregate amount with every identity field empty, or - checked once per source, after the whole column total is known - an amount that exactly equals the total of every *other* row in that column (equivalently, exactly half the column's grand total). The last check requires at least 3 candidate rows and a unique match, to avoid mistaking two genuinely equal-priced works for a footer.
+* For Recommended, Sanctioned and Completed, the "equals every other row" check only searches rows whose Work ID already parsed (the ones staged for the merge); a footer row with *both* a malformed ID and this exact-aggregate signature (and no other signal) is not caught by it - it is still correctly excluded from `works_master.csv` by the malformed-ID exclusion itself, but is logged under `malformed_ids.csv` rather than `summary_rows.csv`. Expenditure, Allocation and Calamity have no such gap: every candidate row, ID-valid or not, is eligible.
+* A footer row found only by the exact-aggregate check had already been counted by the time it could be identified. Its own source's primary amount column (sum, count, min, max, negatives, zeros) is fully backed out before the report is written, and so are its contribution to "Rows"/"Valid IDs" and, for a keyed source, its ID prefix and financial-year tallies. Left uncorrected, as a documented, narrow gap affecting at most one row per source: that row's "valid but normalised"/quirk counts, its distinct-MP-code contribution if it was the only row using that code, and its contribution to other columns' missing/invalid tallies and the exact-duplicate-row count.
 * Duplicates: first occurrence wins; repeats are logged. Exact-duplicate detection compares normalised content with a 64-bit hash (collision odds are negligible at this scale).
 * A Work ID that appears only in Expenditure does not get a master row; it is reported under unmatched IDs.
-* Checks in section 10 are diagnostics on the exported snapshot. Timing differences between exports, partial sanctions or data-entry conventions can all produce hits, so they are review candidates, not findings of error or wrongdoing.
+* Checks in section 11 are diagnostics on the exported snapshot. Timing differences between exports, partial sanctions or data-entry conventions can all produce hits, so they are review candidates, not findings of error or wrongdoing.
 * Categorical consistency detects case / spacing / punctuation variants only, not misspellings.
 """
 
@@ -509,6 +610,7 @@ def render_quality_report(stats: PipelineStats) -> str:
     _section_headlines(stats, out)
     _section_sources(stats, out)
     _section_work_ids(stats, out)
+    _section_summary_rows(stats, out)
     _section_duplicates(stats, out)
     _section_join(stats, out)
     _section_conflicts(stats, out)
@@ -569,15 +671,23 @@ TXN_DOCS = {
 }
 AGG_DOCS = {
     "work_id": ("text", "Canonical Work ID", "all (join key)", "One row per Work ID with at least one payment"),
-    "total_disbursed": ("decimal (rupees)", "Exact sum of valid `fund_disbursed_amount` values", "Fund-utilization", "All payment statuses, duplicates and negatives included"),
-    "payment_count": ("integer", "Payment rows for the work", "Fund-utilization", "Includes rows with a missing amount"),
+    "total_disbursed_all_rows": ("decimal (rupees)", "Exact sum of valid `fund_disbursed_amount` values", "Fund-utilization", "All payment statuses, exact duplicates and negatives included - nothing pre-filtered"),
+    "total_disbursed": ("decimal (rupees)", "Same value as `total_disbursed_all_rows`", "Fund-utilization", "Backward-compatible alias, kept unchanged - prefer `total_disbursed_all_rows` in new code"),
+    "success_amount": ("decimal (rupees)", "Sum of `fund_disbursed_amount` where `payment_status` is exactly `Payment Success`", "Fund-utilization", "All rows with this status, exact duplicates included; section 12 has the full status breakdown"),
+    "in_progress_amount": ("decimal (rupees)", "Sum of `fund_disbursed_amount` where `payment_status` is exactly `Payment In-Progress`", "Fund-utilization", "All rows with this status, exact duplicates included"),
+    "exact_duplicate_amount": ("decimal (rupees)", "Sum of `fund_disbursed_amount` for rows with `duplicate_record = 1`", "Duplicate", "All payment statuses; see section 6.4 - retained, not a fraud finding"),
+    "deduplicated_disbursed_amount": ("decimal (rupees)", "Sum of `fund_disbursed_amount` for rows with `duplicate_record = 0`", "Duplicate, Fund-utilization", "`total_disbursed_all_rows` minus `exact_duplicate_amount`"),
+    "payment_count_all_rows": ("integer", "Payment rows for the work", "Fund-utilization", "Includes rows with a missing amount"),
+    "payment_count": ("integer", "Same value as `payment_count_all_rows`", "Fund-utilization", "Backward-compatible alias, kept unchanged - prefer `payment_count_all_rows` in new code"),
+    "deduplicated_payment_count": ("integer", "Payment rows with `duplicate_record = 0`", "Duplicate", "`payment_count_all_rows` minus `duplicate_record_count`"),
+    "duplicate_record_count": ("integer", "Payments flagged `duplicate_record = 1`", "Duplicate", ""),
+    "duplicate_ratio": ("decimal", "`duplicate_record_count / payment_count_all_rows`, rounded to 4 places", "Duplicate", "0 when the work has no payments"),
     "first_expenditure_date": ("date (ISO)", "Earliest valid expenditure date", "Delay", ""),
     "last_expenditure_date": ("date (ISO)", "Latest valid expenditure date", "Delay", ""),
     "vendor_count": ("integer", "Distinct vendor names after folding case/punctuation", "Fund-utilization", "Rows without a vendor name are not counted"),
-    "amount_missing_count": ("integer", "Payments with no valid amount", "-", "total_disbursed excludes these"),
+    "amount_missing_count": ("integer", "Payments with no valid amount", "-", "total_disbursed_all_rows excludes these"),
     "date_missing_count": ("integer", "Payments with no valid date", "-", ""),
     "negative_amount_count": ("integer", "Payments with a negative amount", "Fund-utilization", ""),
-    "duplicate_record_count": ("integer", "Payments flagged `duplicate_record = 1`", "Duplicate", ""),
 }
 ALLOCATION_DOCS = {
     "source_row": ("integer", "Excel row in the raw workbook", "-", ""),
@@ -597,7 +707,9 @@ CALAMITY_DOCS = {
     "duplicate_record": ("flag 1/0", "Identical to an earlier row", "-", ""),
 }
 AUDIT_DOCS = {
-    "malformed_ids": "Every Work / Work ID cell that could not be parsed: source, source_row, column header, raw_value, reason, detail. Rows are excluded from keyed outputs (Expenditure rows stay in the transactions file with an empty work_id).",
+    "malformed_ids": "Every Work / Work ID cell that could not be parsed and was not a summary/footer row or an NA-unkeyed recommendation: source, source_row, column header, raw_value, reason, detail. Rows are excluded from keyed outputs (Expenditure rows stay in the transactions file with an empty work_id).",
+    "unkeyed_recommendations": "Every Recommended row read as the `NA-...` unkeyed convention (no Work ID assigned yet - a legitimate record, not an error): source_row, raw_value, and its state/mp_name/constituency/recommended_amount.",
+    "summary_rows": "Every row judged to be a summary/footer row and excluded from every analytical output: source, source_row, reason (grand_total_label / total_label / footer_row / summary_amount_only / invalid_record_shape), representative_values.",
     "work_id_duplicates": "Every repeat of a Work ID inside Recommended / Sanctioned / Completed: which row was kept, whether the repeat is `identical` or `conflicting`, and the differing fields.",
     "work_conflicts": "Every field where two sources hold different non-empty values for the same Work ID: chosen source/value and the value from each source.",
     "join_unmatched_ids": "Work IDs that break an expected relationship (Sanctioned not in Recommended, Completed not in Sanctioned, Expenditure not in Sanctioned / master, Completed without Expenditure, Recommended with a Sanction Date but not in Sanctioned).",
@@ -692,13 +804,15 @@ def render_data_dictionary(stats: PipelineStats) -> str:
     out.append("## 6. Required data-quality checks\n")
     out += [
         "| Check | Where reported |", "| --- | --- |",
-        "| Missingness by column | DATA_QUALITY_REPORT section 8 |",
-        "| Duplicate rows / duplicate Work IDs | sections 5 and 6 |",
-        "| Malformed Work IDs | section 4, `malformed_ids.csv` |",
-        "| Invalid dates, negative monetary values, numeric parsing issues | section 8 |",
-        "| Impossible date order and amount relationships | section 10 |",
-        "| Unknown / inconsistent categorical values | section 9 |",
-        "| Encoding / text issues | section 8 (whitespace-normalised, suspect encoding) |",
+        "| Missingness by column | DATA_QUALITY_REPORT section 9 |",
+        "| Duplicate rows / duplicate Work IDs | sections 6 and 7 |",
+        "| Malformed Work IDs | section 4, `malformed_ids.csv` (excludes NA-unkeyed recommendations and summary/footer rows - see below) |",
+        "| Unkeyed (`NA-...`) recommendations | section 4.1, `unkeyed_recommendations.csv` |",
+        "| Summary/footer rows | section 5, `summary_rows.csv` |",
+        "| Invalid dates, negative monetary values, numeric parsing issues | section 9 |",
+        "| Impossible date order and amount relationships | section 11 |",
+        "| Unknown / inconsistent categorical values | section 10 |",
+        "| Encoding / text issues | section 9 (whitespace-normalised, suspect encoding) |",
         "| Zero / negative denominators | not applicable until ratio features exist |",
         "",
     ]

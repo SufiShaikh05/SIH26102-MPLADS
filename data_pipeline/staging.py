@@ -38,7 +38,7 @@ def index_work_table(conn: sqlite3.Connection, key: str) -> None:
 def create_txn_table(conn: sqlite3.Connection) -> None:
     conn.execute(
         "CREATE TABLE txn (source_row INTEGER PRIMARY KEY, work_id TEXT NOT NULL, amount TEXT, "
-        "expenditure_date TEXT, vendor_key TEXT, duplicate INTEGER NOT NULL)"
+        "expenditure_date TEXT, vendor_key TEXT, payment_status TEXT, duplicate INTEGER NOT NULL)"
     )
 
 
@@ -47,6 +47,35 @@ def index_txn_table(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def create_candidate_table(conn: sqlite3.Connection, name: str, text_columns: Sequence[str]) -> None:
+    """A narrow staging table for rows awaiting the footer post-pass before final emission.
+
+    Used for sources whose output can't be written until the whole column total is known
+    (expenditure, allocation, calamity): every candidate row (footer or not, ID-valid or
+    not) is inserted here first; after the post-pass aggregate check removes at most one
+    footer row, the table is scanned once more, in ``source_row`` order, to write the real
+    output. Always has ``source_row`` (primary key) and ``duplicate_record`` (0/1); every
+    other column in ``text_columns`` is stored as TEXT (``NULL`` allowed).
+    """
+    columns = ", ".join(f"{c} TEXT" for c in text_columns)
+    conn.execute(f"CREATE TABLE {name} (source_row INTEGER PRIMARY KEY, duplicate_record INTEGER NOT NULL, {columns})")
+
+
 def insert_rows(conn: sqlite3.Connection, table: str, columns: Sequence[str], rows: Iterable[Sequence[object]]) -> None:
     placeholders = ", ".join("?" for _ in columns)
     conn.executemany(f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({placeholders})", rows)
+
+
+def fetch_row(conn: sqlite3.Connection, table: str, source_row: int) -> dict[str, object] | None:
+    """One row of a candidate/work table as a ``{column: value}`` dict, or ``None`` if absent."""
+    cursor = conn.execute(f"SELECT * FROM {table} WHERE source_row = ?", (source_row,))
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    names = [d[0] for d in cursor.description]
+    return dict(zip(names, row))
+
+
+def delete_row(conn: sqlite3.Connection, table: str, source_row: int) -> None:
+    conn.execute(f"DELETE FROM {table} WHERE source_row = ?", (source_row,))
+    conn.commit()

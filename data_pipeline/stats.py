@@ -12,6 +12,7 @@ from data_pipeline.profiling import SourceProfile
 from data_pipeline.sinks import OutputProfile
 
 SAMPLE_LIMIT = 10
+SUMMARY_ROW_SAMPLE_LIMIT = 25   # footer rows are rare and each one matters for audit - keep more of them
 
 
 @dataclass
@@ -94,15 +95,27 @@ class ExpenditureStats:
     max_payments: int = 0
     max_payments_work: str = ""
     total: Decimal = Decimal(0)
+    success_total: Decimal = Decimal(0)
+    in_progress_total: Decimal = Decimal(0)
+    duplicate_amount_total: Decimal = Decimal(0)
+    deduplicated_amount_total: Decimal = Decimal(0)
+    duplicate_count_total: int = 0
+    deduplicated_count_total: int = 0
     histogram: Counter = field(default_factory=Counter)
 
     BUCKETS = ("1", "2", "3-5", "6-10", "11-20", "21+")
 
     def observe(self, agg: dict) -> None:
-        count = agg["payment_count"]
+        count = agg["payment_count_all_rows"]
         self.works += 1
         self.payments += count
-        self.total += agg["total_disbursed"]
+        self.total += agg["total_disbursed_all_rows"]
+        self.success_total += agg["success_amount"]
+        self.in_progress_total += agg["in_progress_amount"]
+        self.duplicate_amount_total += agg["exact_duplicate_amount"]
+        self.deduplicated_amount_total += agg["deduplicated_disbursed_amount"]
+        self.duplicate_count_total += agg["duplicate_record_count"]
+        self.deduplicated_count_total += agg["deduplicated_payment_count"]
         if count > self.max_payments:
             self.max_payments, self.max_payments_work = count, agg["work_id"]
         if count <= 2:
@@ -119,6 +132,48 @@ class ExpenditureStats:
 
 
 @dataclass
+class SummaryRowStats:
+    """Footer/summary rows excluded from every analytical output, grouped by (source, reason).
+
+    A row lands here only via :mod:`data_pipeline.footer_detection` - never merely for
+    lacking a Work ID (that is :class:`UnkeyedStats` or plain malformed-ID handling).
+    """
+
+    total: int = 0
+    counts: Counter = field(default_factory=Counter)                          # (source, reason) -> count
+    amount: dict[tuple[str, str], Decimal] = field(default_factory=lambda: defaultdict(Decimal))
+    rows: dict[tuple[str, str], list[int]] = field(default_factory=lambda: defaultdict(list))
+
+    def record(self, source: str, reason: str, row_no: int, amount: Decimal | None) -> None:
+        self.total += 1
+        key = (source, reason)
+        self.counts[key] += 1
+        if amount is not None:
+            self.amount[key] += amount
+        if len(self.rows[key]) < SUMMARY_ROW_SAMPLE_LIMIT:
+            self.rows[key].append(row_no)
+
+
+@dataclass
+class UnkeyedStats:
+    """NA-* unkeyed recommendations: legitimate records with no Work ID yet.
+
+    Kept apart from both genuine malformed IDs and footer rows - see
+    ``data_pipeline.work_id.is_unkeyed_na``.
+    """
+
+    total: int = 0
+    by_source: Counter = field(default_factory=Counter)
+    rows: dict[str, list[int]] = field(default_factory=lambda: defaultdict(list))
+
+    def record(self, source: str, row_no: int) -> None:
+        self.total += 1
+        self.by_source[source] += 1
+        if len(self.rows[source]) < SAMPLE_LIMIT:
+            self.rows[source].append(row_no)
+
+
+@dataclass
 class PipelineStats:
     run: RunInfo = field(default_factory=RunInfo)
     profiles: dict[str, SourceProfile] = field(default_factory=dict)
@@ -129,8 +184,11 @@ class PipelineStats:
     checks: CheckStats = field(default_factory=CheckStats)
     diagnostics: DiagnosticStats = field(default_factory=DiagnosticStats)
     expenditure: ExpenditureStats = field(default_factory=ExpenditureStats)
+    summary_rows: SummaryRowStats = field(default_factory=SummaryRowStats)
+    unkeyed: UnkeyedStats = field(default_factory=UnkeyedStats)
     demo: dict[str, int] = field(default_factory=dict)
     malformed_logged: int = 0
+    unkeyed_logged: int = 0
 
     def to_summary(self) -> dict:
         """JSON-serialisable digest (counts only - no giant counters)."""
@@ -147,9 +205,11 @@ class PipelineStats:
                 "data_rows": p.data_rows,
                 "truncated_by_limit": p.limit_hit,
                 "exact_duplicate_rows": p.exact_duplicate_rows,
+                "summary_rows_excluded": p.summary_rows_excluded,
                 "work_ids": {
                     "valid": p.id.valid,
                     "malformed": p.id.malformed,
+                    "na_unkeyed": p.id.na_unkeyed,
                     "distinct_valid": p.distinct_ids,
                     "with_warnings": p.id.with_warnings,
                     "malformed_reasons": dict(p.id.reasons),
@@ -223,4 +283,24 @@ class PipelineStats:
             "outputs": {name: {"rows": o.rows, "columns": len(o.columns)} for name, o in self.outputs.items()},
             "demo_rows": self.demo,
             "malformed_ids_logged": self.malformed_logged,
+            "unkeyed_recommendations_logged": self.unkeyed_logged,
+            "summary_rows": {
+                "total": self.summary_rows.total,
+                "by_source_reason": {
+                    f"{source}:{reason}": {
+                        "count": self.summary_rows.counts[(source, reason)],
+                        "amount_involved": (
+                            decimal_to_str(self.summary_rows.amount[(source, reason)])
+                            if self.summary_rows.amount[(source, reason)]
+                            else None
+                        ),
+                        "source_rows": self.summary_rows.rows[(source, reason)],
+                    }
+                    for source, reason in sorted(self.summary_rows.counts)
+                },
+            },
+            "unkeyed_recommendations": {
+                "total": self.unkeyed.total,
+                "by_source": dict(self.unkeyed.by_source),
+            },
         }

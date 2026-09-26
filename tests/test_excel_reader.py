@@ -9,7 +9,6 @@ import contextlib
 import datetime as dt
 import itertools
 import os
-import re
 import subprocess
 import sys
 import tracemalloc
