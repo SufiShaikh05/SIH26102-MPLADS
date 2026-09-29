@@ -30,3 +30,6 @@ Thumbs.db
 
 # Generated smoke-test output
 .smoke/
+
+# Local submission archive
+SIH26102-MPLADS-SUBMISSION.zip
