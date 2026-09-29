@@ -1,6 +1,6 @@
 // DEVELOPMENT FALLBACK ONLY. Loaded when VITE_USE_MOCK=true. Matches the API contract; all values are synthetic.
 import { ApiError } from './client'
-import type { Anomaly, Page, Query, Summary } from './client'
+import type { Anomaly, Page, Query, StateBreakdown, Summary } from './client'
 
 let seed = 7
 const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
@@ -32,14 +32,22 @@ const DATA: Anomaly[] = Array.from({ length: 120 }, (_, i) => {
 const wait = <T,>(v: T) => new Promise<T>(r => setTimeout(() => r(v), 250))
 
 export const summary = (): Promise<Summary> => {
-  const by = new Map<string, { state: string; works: number; review_candidates: number }>()
   const dist: Record<string, number> = {}
-  DATA.forEach(d => {
-    const s = by.get(d.state) ?? { state: d.state, works: 0, review_candidates: 0 }
-    s.works += 800 + d.payment_count * 40; s.review_candidates += 1; by.set(d.state, s)
-    dist[d.review_priority_label] = (dist[d.review_priority_label] ?? 0) + 1
+  DATA.forEach(d => { dist[d.review_priority_label] = (dist[d.review_priority_label] ?? 0) + 1 })
+  return wait({
+    total_works: 81335, works_with_expenditure: 57700, completed_works: 35475, review_candidates: DATA.length,
+    review_priority_label_counts: Object.entries(dist).map(([label, count]) => ({ label, count })),
   })
-  return wait({ total_works: 81335, works_with_expenditure: 57700, completed_works: 35475, review_candidates: DATA.length, label_distribution: dist, state_breakdown: [...by.values()] })
+}
+
+// Mirrors the real /api/v1/states shape: { state, work_count, review_candidate_count }.
+export const stateBreakdown = (): Promise<StateBreakdown[]> => {
+  const by = new Map<string, StateBreakdown>()
+  DATA.forEach(d => {
+    const s = by.get(d.state) ?? { state: d.state, work_count: 0, review_candidate_count: 0 }
+    s.work_count += 800 + d.payment_count * 40; s.review_candidate_count += 1; by.set(d.state, s)
+  })
+  return wait([...by.values()])
 }
 
 export const anomalies = (q: Query): Promise<Page<Anomaly>> => {

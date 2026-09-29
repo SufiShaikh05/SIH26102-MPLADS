@@ -3,6 +3,9 @@ import { api, sortParam, type Query } from './api/client'
 import { Bars, Card, Chip, Empty, ErrorBox, Loading, PRIORITY_LABELS, inr, num, pct, priorityRank, tone, useAsync } from './ui'
 
 const PAGE_SIZE = 15
+// The Review Candidates table only ever shows works at or above this score; the "Min score"
+// filter can raise that floor further but never lower it.
+const REVIEW_CANDIDATE_MIN_SCORE = 25
 const COLS: { key: string; label: string; sort?: string; right?: boolean }[] = [
   { key: 'review_priority_label', label: 'Priority' }, { key: 'score', label: 'Score', sort: 'review_priority_score', right: true },
   { key: 'work_id', label: 'Work ID' }, { key: 'state', label: 'State' }, { key: 'work_category', label: 'Work Category' },
@@ -13,16 +16,16 @@ const COLS: { key: string; label: string; sort?: string; right?: boolean }[] = [
 
 function Overview() {
   const s = useAsync(api.summary, [])
+  const sb = useAsync(api.stateBreakdown, [])
   if (s.loading && !s.data) return <Loading text="Loading overview…" />
   if (s.error) return <ErrorBox message={s.error} retry={s.retry} />
   const d = s.data!
   const cards: [string, number][] = [['Total Works', d.total_works], ['Works with Expenditure', d.works_with_expenditure], ['Completed Works', d.completed_works], ['Review Candidates', d.review_candidates]]
-  const raw = d.label_distribution ?? {}
-  // All four labels, most severe first (zero when absent); any unrecognised labels are appended.
-  const dist: [string, number][] = Object.keys(raw).length
-    ? [...[...PRIORITY_LABELS].reverse().map(l => [l, raw[l] ?? 0] as [string, number]), ...Object.entries(raw).filter(([l]) => priorityRank(l) < 0)]
-    : []
-  const states = [...(d.state_breakdown ?? [])].sort((a, b) => b.review_candidates - a.review_candidates).slice(0, 8)
+  const raw = d.review_priority_label_counts ?? []
+  // Backend returns an array of { label, count } objects; read each one directly.
+  // Only the display order (most severe first) uses the known label ranking, not the counts or labels themselves.
+  const dist: [string, number][] = [...raw].map(r => [r.label, r.count] as [string, number]).sort((a, b) => priorityRank(b[0]) - priorityRank(a[0]))
+  const states = [...(sb.data ?? [])].sort((a, b) => b.review_candidate_count - a.review_candidate_count).slice(0, 8)
   return (
     <>
       <div className="cards">{cards.map(([l, v], i) => <div key={l} className={`stat ${i === 3 ? 'key' : ''}`}><span>{l}</span><strong>{num(v)}</strong></div>)}</div>
@@ -31,7 +34,9 @@ function Overview() {
           {dist.length ? <Bars wide rows={dist.map(([l, v]) => ({ label: l, value: v, tone: tone(l) }))} /> : <Empty>The summary endpoint did not include a label distribution.</Empty>}
         </Card>
         <Card title="State-wise Review Candidates" note="Top 8 states">
-          {states.length ? <Bars rows={states.map(x => ({ label: x.state, value: x.review_candidates, note: `of ${num(x.works)} works` }))} /> : <Empty>The summary endpoint did not include a state breakdown.</Empty>}
+          {sb.loading && !sb.data ? <Loading text="Loading state breakdown…" /> : sb.error ? <ErrorBox message={sb.error} retry={sb.retry} /> :
+            states.length ? <Bars rows={states.map(x => ({ label: x.state, value: x.review_candidate_count, note: `of ${num(x.work_count)} works` }))} /> :
+              <Empty>The states endpoint did not include a review-candidate breakdown.</Empty>}
         </Card>
       </div>
     </>
@@ -46,7 +51,7 @@ export default function Dashboard({ open }: { open: (id: string) => void }) {
   const [searchMsg, setSearchMsg] = useState('')
   const states = useAsync(api.states, []), cats = useAsync(api.categories, [])
   const q: Query = { page, page_size: PAGE_SIZE, label: f.label || undefined, state: f.state || undefined, work_category: f.work_category || undefined,
-    min_score: f.min_score === '' ? undefined : Number(f.min_score), sort: sortParam(sort.field, sort.dir) }
+    min_score: f.min_score === '' ? REVIEW_CANDIDATE_MIN_SCORE : Math.max(REVIEW_CANDIDATE_MIN_SCORE, Number(f.min_score)), sort: sortParam(sort.field, sort.dir) }
   const list = useAsync(() => api.anomalies(q), [JSON.stringify(q)])
   const set = (k: keyof typeof f, v: string) => { setF({ ...f, [k]: v }); setPage(1) }
   const filtered = Object.values(f).some(Boolean)

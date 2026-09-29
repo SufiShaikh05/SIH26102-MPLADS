@@ -1,0 +1,5 @@
+# Runtime dependencies of the dashboard backend only.
+# The data pipeline and feature engineering still need no third-party packages (see ../requirements.txt).
+# Verified on fastapi 0.115.14 and 0.141.1 (Python 3.12).
+fastapi>=0.115
+uvicorn[standard]>=0.30

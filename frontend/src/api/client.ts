@@ -10,11 +10,13 @@ export interface Anomaly {
   explanation_text: string
   [extra: string]: unknown
 }
+export interface PriorityLabelCount { label: string; count: number }
 export interface Summary {
   total_works: number; works_with_expenditure: number; completed_works: number; review_candidates: number
-  label_distribution?: Record<string, number>
-  state_breakdown?: { state: string; works: number; review_candidates: number }[]
+  // GET /api/v1/summary returns this as an ARRAY of { label, count } objects, not a { label: count } map.
+  review_priority_label_counts?: PriorityLabelCount[]
 }
+export interface StateBreakdown { state: string; work_count: number; review_candidate_count: number }
 export interface Page<T> { items: T[]; total: number; page: number; page_size: number }
 export interface Query {
   page: number; page_size: number; label?: string; state?: string
@@ -46,6 +48,13 @@ const toList = (raw: unknown): string[] => {
   const arr = Array.isArray(raw) ? raw : ((raw as Record<string, unknown>)?.items ?? (raw as Record<string, unknown>)?.states ?? (raw as Record<string, unknown>)?.work_categories ?? [])
   return (arr as unknown[]).map(x => typeof x === 'string' ? x : String((x as Record<string, unknown>).name ?? (x as Record<string, unknown>).state ?? (x as Record<string, unknown>).work_category ?? '')).filter(Boolean)
 }
+// GET /api/v1/states returns { items: [{ state, work_count, review_candidate_count }] }.
+const toStateBreakdown = (raw: unknown): StateBreakdown[] => {
+  const arr = Array.isArray(raw) ? raw : ((raw as Record<string, unknown>)?.items ?? [])
+  return (arr as Record<string, unknown>[])
+    .map(x => ({ state: String(x.state ?? ''), work_count: Number(x.work_count ?? 0), review_candidate_count: Number(x.review_candidate_count ?? 0) }))
+    .filter(x => x.state)
+}
 const toPage = (raw: Record<string, unknown>, q: Query): Page<Anomaly> => ({
   items: (raw.items ?? raw.results ?? raw.data ?? []) as Anomaly[],
   total: Number(raw.total ?? raw.total_count ?? 0), page: Number(raw.page ?? q.page), page_size: Number(raw.page_size ?? q.page_size),
@@ -63,4 +72,6 @@ export const api = {
     isMock ? (await mock()).work(id) : get<Partial<Anomaly>>(`/api/v1/works/${encodeURIComponent(id)}`),
   states: async (): Promise<string[]> => isMock ? (await mock()).states() : toList(await get('/api/v1/states')),
   categories: async (): Promise<string[]> => isMock ? (await mock()).categories() : toList(await get('/api/v1/work-categories')),
+  // Same /api/v1/states response as `states`, kept as the full { state, work_count, review_candidate_count } records for the chart.
+  stateBreakdown: async (): Promise<StateBreakdown[]> => isMock ? (await mock()).stateBreakdown() : toStateBreakdown(await get('/api/v1/states')),
 }

@@ -1,4 +1,7 @@
 -r requirements.txt
+-r backend/requirements.txt
 pytest>=8.0
+# Backend API tests only: FastAPI's TestClient is built on httpx.
+httpx>=0.27
 # Tests only: builds the synthetic .xlsx fixtures. Production code never imports it.
 openpyxl>=3.1,<3.2
