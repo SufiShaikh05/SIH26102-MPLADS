@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { api, sortParam, type Query } from './api/client'
+import DuplicateReview from './DuplicateReview'
 import ImplementationTrends from './ImplementationTrends'
 import { Bars, Card, Chip, Empty, ErrorBox, Loading, PRIORITY_LABELS, inr, num, pct, priorityRank, tone, useAsync } from './ui'
 
@@ -67,52 +68,104 @@ export default function Dashboard({ open }: { open: (id: string) => void }) {
   }
   const clickSort = (field: string) => { setSort(s => ({ field, dir: s.field === field && s.dir === 'desc' ? 'asc' : 'desc' })); setPage(1) }
 
+  const [activeView, setActiveView] = useState<'anomalies' | 'duplicates'>(
+    location.hash === '#/duplicates' ? 'duplicates' : 'anomalies',
+  )
+
+  useEffect(() => {
+    const handleHash = () => {
+      if (location.hash === '#/duplicates') {
+        setActiveView('duplicates')
+      } else if (!location.hash || location.hash === '#/' || location.hash.startsWith('#/anomalies')) {
+        setActiveView('anomalies')
+      }
+    }
+    window.addEventListener('hashchange', handleHash)
+    return () => window.removeEventListener('hashchange', handleHash)
+  }, [])
+
   return (
     <>
-      <Overview />
-      <ImplementationTrends />
-      <Card title="Review Candidates" note="Highest Review Priority first by default">
-        <div className="filters">
-          <form onSubmit={submit} className="search">
-            <input value={search} onChange={e => { setSearch(e.target.value); setSearchMsg('') }} placeholder="Search by Work ID" aria-label="Search by Work ID" />
-            <button className="btn primary" type="submit">Find work</button>
-          </form>
-          <select aria-label="State" value={f.state} onChange={e => set('state', e.target.value)}><option value="">All states</option>{states.data?.map(s => <option key={s}>{s}</option>)}</select>
-          <select aria-label="Work category" value={f.work_category} onChange={e => set('work_category', e.target.value)}><option value="">All categories</option>{cats.data?.map(s => <option key={s}>{s}</option>)}</select>
-          <select aria-label="Priority" value={f.label} onChange={e => set('label', e.target.value)}><option value="">All priorities</option>{PRIORITY_LABELS.map(l => <option key={l}>{l}</option>)}</select>
-          <input className="score" type="number" min={0} aria-label="Minimum score" placeholder="Min score" value={f.min_score} onChange={e => set('min_score', e.target.value)} />
-          {filtered && <button className="btn" onClick={() => { setF({ label: '', state: '', work_category: '', min_score: '' }); setPage(1) }}>Clear filters</button>}
-        </div>
-        {searchMsg && <div className="inline-msg" role="alert">{searchMsg}</div>}
-        {list.error ? <ErrorBox message={list.error} retry={list.retry} /> : (
-          <div className="tablewrap" aria-busy={list.loading}>
-            <table>
-              <thead><tr>{COLS.map(c => (
-                <th key={c.key} className={c.right ? 'r' : ''} aria-sort={c.sort && sort.field === c.sort ? (sort.dir === 'desc' ? 'descending' : 'ascending') : undefined}>
-                  {c.sort ? <button className="sortbtn" onClick={() => clickSort(c.sort!)}>{c.label}<span>{sort.field === c.sort ? (sort.dir === 'desc' ? ' ▼' : ' ▲') : ''}</span></button> : c.label}
-                </th>))}</tr></thead>
-              <tbody>
-                {list.data?.items.map(w => (
-                  <tr key={w.work_id} tabIndex={0} onClick={() => open(w.work_id)} onKeyDown={e => e.key === 'Enter' && open(w.work_id)}>
-                    <td><Chip label={w.review_priority_label} /></td><td className="r score-cell">{w.review_priority_score}</td>
-                    <td className="id">{w.work_id}</td><td>{w.state}</td><td>{w.work_category}</td><td className="r">{inr(w.sanction_amount)}</td>
-                    <td className="r">{pct(w.success_utilization_ratio)}</td><td className="r">{num(w.payment_count)}</td><td className="r">{num(w.vendor_count)}</td>
-                    <td className="r">{pct(w.duplicate_ratio)}</td><td>{w.work_status}</td>
-                  </tr>))}
-              </tbody>
-            </table>
-            {list.loading && !list.data && <Loading text="Loading review candidates…" />}
-            {!list.loading && list.data?.items.length === 0 && <Empty>{filtered ? 'No works match these filters. Clear a filter to widen the results.' : 'No review candidates are available yet. Check that the anomaly output has been generated.'}</Empty>}
+      <nav className="dash-nav-bar" role="tablist" aria-label="Dashboard Intelligence Modules">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeView === 'anomalies'}
+          className={`dash-nav-btn ${activeView === 'anomalies' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveView('anomalies')
+            if (location.hash === '#/duplicates') location.hash = ''
+          }}
+        >
+          Anomaly &amp; Trends Intelligence
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeView === 'duplicates'}
+          className={`dash-nav-btn ${activeView === 'duplicates' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveView('duplicates')
+            location.hash = '#/duplicates'
+          }}
+        >
+          Potential Duplicate Detection
+          <span className="dash-nav-badge">Sentinel 2.0</span>
+        </button>
+      </nav>
+
+      {/* Duplicate Work Detection View */}
+      {activeView === 'duplicates' && (
+        <DuplicateReview openWork={open} />
+      )}
+
+      {/* Anomaly & Trends Intelligence View */}
+      <div hidden={activeView !== 'anomalies'}>
+        <Overview />
+        <ImplementationTrends />
+        <Card title="Review Candidates" note="Highest Review Priority first by default">
+          <div className="filters">
+            <form onSubmit={submit} className="search">
+              <input value={search} onChange={e => { setSearch(e.target.value); setSearchMsg('') }} placeholder="Search by Work ID" aria-label="Search by Work ID" />
+              <button className="btn primary" type="submit">Find work</button>
+            </form>
+            <select aria-label="State" value={f.state} onChange={e => set('state', e.target.value)}><option value="">All states</option>{states.data?.map(s => <option key={s}>{s}</option>)}</select>
+            <select aria-label="Work category" value={f.work_category} onChange={e => set('work_category', e.target.value)}><option value="">All categories</option>{cats.data?.map(s => <option key={s}>{s}</option>)}</select>
+            <select aria-label="Priority" value={f.label} onChange={e => set('label', e.target.value)}><option value="">All priorities</option>{PRIORITY_LABELS.map(l => <option key={l}>{l}</option>)}</select>
+            <input className="score" type="number" min={0} aria-label="Minimum score" placeholder="Min score" value={f.min_score} onChange={e => set('min_score', e.target.value)} />
+            {filtered && <button className="btn" onClick={() => { setF({ label: '', state: '', work_category: '', min_score: '' }); setPage(1) }}>Clear filters</button>}
           </div>
-        )}
-        {list.data && list.data.total > 0 && (
-          <div className="pager">
-            <span className="muted">Page {page} of {pages}, {num(list.data.total)} works</span>
-            <button className="btn" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
-            <button className="btn" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button>
-          </div>
-        )}
-      </Card>
+          {searchMsg && <div className="inline-msg" role="alert">{searchMsg}</div>}
+          {list.error ? <ErrorBox message={list.error} retry={list.retry} /> : (
+            <div className="tablewrap" aria-busy={list.loading}>
+              <table>
+                <thead><tr>{COLS.map(c => (
+                  <th key={c.key} className={c.right ? 'r' : ''} aria-sort={c.sort && sort.field === c.sort ? (sort.dir === 'desc' ? 'descending' : 'ascending') : undefined}>
+                    {c.sort ? <button className="sortbtn" onClick={() => clickSort(c.sort!)}>{c.label}<span>{sort.field === c.sort ? (sort.dir === 'desc' ? ' ▼' : ' ▲') : ''}</span></button> : c.label}
+                  </th>))}</tr></thead>
+                <tbody>
+                  {list.data?.items.map(w => (
+                    <tr key={w.work_id} tabIndex={0} onClick={() => open(w.work_id)} onKeyDown={e => e.key === 'Enter' && open(w.work_id)}>
+                      <td><Chip label={w.review_priority_label} /></td><td className="r score-cell">{w.review_priority_score}</td>
+                      <td className="id">{w.work_id}</td><td>{w.state}</td><td>{w.work_category}</td><td className="r">{inr(w.sanction_amount)}</td>
+                      <td className="r">{pct(w.success_utilization_ratio)}</td><td className="r">{num(w.payment_count)}</td><td className="r">{num(w.vendor_count)}</td>
+                      <td className="r">{pct(w.duplicate_ratio)}</td><td>{w.work_status}</td>
+                    </tr>))}
+                </tbody>
+              </table>
+              {list.loading && !list.data && <Loading text="Loading review candidates…" />}
+              {!list.loading && list.data?.items.length === 0 && <Empty>{filtered ? 'No works match these filters. Clear a filter to widen the results.' : 'No review candidates are available yet. Check that the anomaly output has been generated.'}</Empty>}
+            </div>
+          )}
+          {list.data && list.data.total > 0 && (
+            <div className="pager">
+              <span className="muted">Page {page} of {pages}, {num(list.data.total)} works</span>
+              <button className="btn" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
+              <button className="btn" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button>
+            </div>
+          )}
+        </Card>
+      </div>
     </>
   )
 }

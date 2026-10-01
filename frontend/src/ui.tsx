@@ -18,13 +18,21 @@ export const formatPeriod = (p?: string | null) => {
   return months[mi] ? `${months[mi]} ${y}` : p
 }
 export const pct = (r?: number | null) => (r == null || isNaN(r) ? '–' : `${(r * 100).toFixed(0)}%`)
+export const pctDec = (r?: number | null, decimals = 2) => (r == null || isNaN(r) ? '–' : `${(r * 100).toFixed(decimals)}%`)
 export const num = (n?: number | null) => (n == null || isNaN(n) ? '–' : n.toLocaleString('en-IN'))
 export const signalText = (s?: string | null) => (s ? s.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase()) : '')
 
 // Exact labels emitted by the anomaly engine, least to most severe.
 export const PRIORITY_LABELS = ['Normal Monitoring', 'Low Review Priority', 'Medium Review Priority', 'High Review Priority']
 export const priorityRank = (l: string) => PRIORITY_LABELS.findIndex(x => x.toLowerCase() === l.toLowerCase()) // -1 = unknown
-export const tone = (l: string) => l.toLowerCase().split(' ')[0] // normal | low | medium | high (CSS hook)
+export const tone = (l: string) => {
+  const lower = l.toLowerCase()
+  if (lower.startsWith('high')) return 'high'
+  if (lower.startsWith('medium')) return 'medium'
+  if (lower.startsWith('low')) return 'low'
+  if (lower.startsWith('batch')) return 'batch'
+  return lower.split(' ')[0]
+}
 
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]) {
   const [s, set] = useState<{ data?: T; error?: string; loading: boolean }>({ loading: true })
@@ -60,5 +68,17 @@ export function Bars({ rows, wide }: { rows: { label: string; value: number; not
         </li>
       ))}
     </ul>
+  )
+}
+
+export function GateBadge({ similarity }: { similarity: number }) {
+  const passed = similarity >= 0.85
+  return (
+    <span
+      className={`gate-badge ${passed ? 'gate-pass' : 'gate-fail'}`}
+      title={passed ? 'Meets strict ≥ 85.00% High-Confidence text similarity gate' : 'Below strict 85.00% High-Confidence text gate'}
+    >
+      {passed ? '≥85% Gate Met' : '<85% Below Gate'}
+    </span>
   )
 }

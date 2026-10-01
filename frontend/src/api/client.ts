@@ -34,6 +34,76 @@ export interface TrendResponse {
   state: string | null
   series: TrendPoint[]
 }
+export interface DuplicatePairRecord {
+  pair_id: string
+  work_id_a: string
+  work_id_b: string
+  cluster_id: string | null
+  state: string | null
+  constituency: string | null
+  mp_name: string | null
+  work_category: string | null
+  description_a: string | null
+  description_b: string | null
+  sanction_amount_a: number | null
+  sanction_amount_b: number | null
+  amount_difference_pct: number | null
+  sanction_date_a: string | null
+  sanction_date_b: string | null
+  date_gap_days: number | null
+  text_similarity: number
+  shared_entity_tokens: string[]
+  duplicate_risk_score: number
+  review_priority: string
+  is_batch_scheme: boolean
+  batch_frequency: number
+  consecutive_serials: boolean
+  reasons: string[]
+  explanation_text: string
+}
+
+export interface DuplicateClusterRecord {
+  cluster_id: string
+  work_count: number
+  is_batch_scheme: boolean
+  work_ids: string[]
+}
+
+export interface DuplicateSummary {
+  total_duplicate_pairs: number
+  high_confidence_pairs: number
+  medium_confidence_pairs: number
+  batch_scheme_pairs: number
+  total_clusters: number
+  affected_works_count: number
+}
+
+export interface DuplicatePage {
+  items: DuplicatePairRecord[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface WorkDuplicatesResponse {
+  work_id: string
+  has_duplicates: boolean
+  duplicate_pairs: DuplicatePairRecord[]
+  cluster_id: string | null
+  cluster_work_ids: string[]
+}
+
+export interface DuplicateQuery {
+  page?: number
+  page_size?: number
+  state?: string
+  constituency?: string
+  priority?: string
+  is_batch?: boolean
+  min_score?: number
+  sort_by?: 'score_desc' | 'score_asc' | 'amount_desc' | 'date_gap_asc' | string
+}
+
 export interface Page<T> { items: T[]; total: number; page: number; page_size: number }
 export interface Query {
   page: number; page_size: number; label?: string; state?: string
@@ -42,6 +112,7 @@ export interface Query {
 
 export const isMock = import.meta.env.VITE_USE_MOCK === 'true'
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '')
+
 
 export class ApiError extends Error {
   constructor(message: string, public status?: number) { super(message) }
@@ -96,4 +167,10 @@ export const api = {
     if (state && state.trim()) params.state = state.trim()
     return isMock ? (await mock()).trends(params.state) : get<TrendResponse>('/api/v1/trends', params)
   },
+  duplicateSummary: async (): Promise<DuplicateSummary> =>
+    isMock ? (await mock()).duplicateSummary() : get<DuplicateSummary>('/api/v1/duplicates/summary'),
+  duplicates: async (q: DuplicateQuery = {}): Promise<DuplicatePage> =>
+    isMock ? (await mock()).duplicates(q) : get<DuplicatePage>('/api/v1/duplicates', q),
+  workDuplicates: async (work_id: string): Promise<WorkDuplicatesResponse> =>
+    isMock ? (await mock()).workDuplicates(work_id) : get<WorkDuplicatesResponse>(`/api/v1/duplicates/${encodeURIComponent(work_id)}`),
 }

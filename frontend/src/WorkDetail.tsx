@@ -1,12 +1,27 @@
-import { api, type Anomaly } from './api/client'
-import { Card, Chip, ErrorBox, Loading, inr, num, pct, signalText, useAsync } from './ui'
+import { useState } from 'react'
+import { api, type Anomaly, type DuplicatePairRecord } from './api/client'
+import { Card, Chip, ErrorBox, GateBadge, Loading, inr, num, pct, pctDec, signalText, useAsync } from './ui'
 
 export default function WorkDetail({ id, back }: { id: string; back: () => void }) {
+  const [selectedPair, setSelectedPair] = useState<DuplicatePairRecord | null>(null)
+
   const r = useAsync(async () => {
     const [a, w] = await Promise.all([api.anomaly(id), api.work(id).catch(() => ({}))])
     return { ...w, ...a } as Anomaly // anomaly record wins; /works adds any extra fields
   }, [id])
+
+  const dups = useAsync(async () => {
+    return api.workDuplicates(id).catch(() => ({
+      work_id: id,
+      has_duplicates: false,
+      duplicate_pairs: [],
+      cluster_id: null,
+      cluster_work_ids: [],
+    }))
+  }, [id])
+
   const w = r.data
+  const dData = dups.data
   const signals = w ? [w.top_signal_1, w.top_signal_2, w.top_signal_3].filter(Boolean) as string[] : []
   const facts: [string, string][] = w ? [
     ['Work ID', w.work_id], ['State', w.state], ['Constituency', w.constituency], ['MP', w.mp_name], ['Implementing authority', w.ida],
@@ -15,6 +30,12 @@ export default function WorkDetail({ id, back }: { id: string; back: () => void 
     ['Utilization', pct(w.success_utilization_ratio)], ['Payment count', num(w.payment_count)], ['Vendor count', num(w.vendor_count)],
     ['Duplicate ratio', pct(w.duplicate_ratio)], ['Days since sanction', num(w.days_since_sanction)], ['Days since last payment', num(w.days_since_last_payment)],
   ] : []
+
+  const jumpToWork = (peerId: string) => {
+    location.hash = `#/work/${encodeURIComponent(peerId)}`
+    setSelectedPair(null)
+  }
+
   return (
     <div className="detail">
       <button className="btn back" onClick={back}>Back to dashboard</button>
@@ -45,6 +66,216 @@ export default function WorkDetail({ id, back }: { id: string; back: () => void 
               <dl className="facts">{facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v || '–'}</dd></div>)}</dl>
             </Card>
           </div>
+
+          {/* Sentinel 2.0 Potential Duplicate Work Intelligence */}
+          {dData && dData.has_duplicates && (
+            <section className="panel dup-detail-panel" style={{ marginTop: '16px' }}>
+              <header>
+                <div>
+                  <h2>Potential Duplicate Work Intelligence</h2>
+                  <span className="muted">
+                    Sentinel 2.0 identified {dData.duplicate_pairs.length} potential duplicate pair relationship(s)
+                    {dData.cluster_id ? ` across Cluster ${dData.cluster_id} (${dData.cluster_work_ids.length} linked works)` : ''}.
+                  </span>
+                </div>
+              </header>
+
+              <div className="tablewrap" style={{ marginTop: '12px' }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Priority</th>
+                      <th className="r">Risk Score</th>
+                      <th>Paired Work</th>
+                      <th>Text Similarity</th>
+                      <th className="r">Peer Sanction</th>
+                      <th className="r">Amount Diff</th>
+                      <th className="r">Date Gap</th>
+                      <th>Serials</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dData.duplicate_pairs.map(p => {
+                      const peerId = p.work_id_a.toUpperCase() === id.toUpperCase() ? p.work_id_b : p.work_id_a
+                      const peerAmt = p.work_id_a.toUpperCase() === id.toUpperCase() ? p.sanction_amount_b : p.sanction_amount_a
+                      return (
+                        <tr key={p.pair_id} onClick={() => setSelectedPair(p)}>
+                          <td><Chip label={p.review_priority} /></td>
+                          <td className="r score-cell"><strong>{p.duplicate_risk_score.toFixed(1)}</strong></td>
+                          <td className="id">
+                            <button
+                              type="button"
+                              className="linkbtn"
+                              onClick={e => {
+                                e.stopPropagation()
+                                jumpToWork(peerId)
+                              }}
+                            >
+                              {peerId}
+                            </button>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+                                {pctDec(p.text_similarity, 2)}
+                              </span>
+                              <GateBadge similarity={p.text_similarity} />
+                            </div>
+                          </td>
+                          <td className="r">{inr(peerAmt)}</td>
+                          <td className="r">{p.amount_difference_pct != null ? pctDec(p.amount_difference_pct, 1) : '–'}</td>
+                          <td className="r">{p.date_gap_days != null ? `${p.date_gap_days}d` : '–'}</td>
+                          <td>{p.consecutive_serials ? <span className="consec-tag">Consecutive</span> : '–'}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn"
+                              style={{ padding: '3px 8px', fontSize: '13px' }}
+                              onClick={e => {
+                                e.stopPropagation()
+                                setSelectedPair(p)
+                              }}
+                            >
+                              Compare
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="dup-disclaimer" style={{ marginTop: '12px' }}>
+                <strong>Verification Note:</strong> Potential Duplicate Risk Scores identify similarity and proximity patterns for human verification. They do not constitute proof of duplication or wrongdoing.
+              </div>
+            </section>
+          )}
+
+          {/* Modal for side-by-side comparison from WorkDetail */}
+          {selectedPair && (
+            <div
+              className="modal-backdrop"
+              onClick={() => setSelectedPair(null)}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <header className="modal-header">
+                  <div>
+                    <h2>Pair Inspection: {selectedPair.pair_id}</h2>
+                    <span className="muted">
+                      {selectedPair.cluster_id ? `Cluster: ${selectedPair.cluster_id}` : 'Unclustered pair'} &bull; {selectedPair.state || '–'} ({selectedPair.constituency || '–'})
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Chip label={selectedPair.review_priority} />
+                    <button type="button" className="btn" onClick={() => setSelectedPair(null)}>✕ Close</button>
+                  </div>
+                </header>
+
+                <div className="modal-body">
+                  <div className="modal-scoreband">
+                    <div>
+                      <span className="muted">Risk Score</span>
+                      <strong className="big">{selectedPair.duplicate_risk_score.toFixed(1)}</strong>
+                    </div>
+                    <div>
+                      <span className="muted">Text Similarity</span>
+                      <strong className="big">{pctDec(selectedPair.text_similarity, 2)}</strong>
+                      <div style={{ marginTop: '4px' }}>
+                        <GateBadge similarity={selectedPair.text_similarity} />
+                      </div>
+                    </div>
+                    <div>
+                      <span className="muted">Amount Difference</span>
+                      <strong className="big">
+                        {selectedPair.amount_difference_pct != null ? pctDec(selectedPair.amount_difference_pct, 2) : '–'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="muted">Date Gap</span>
+                      <strong className="big">
+                        {selectedPair.date_gap_days != null ? `${selectedPair.date_gap_days} days` : '–'}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="side-by-side-grid">
+                    <div className="compare-card">
+                      <div className="compare-card-header">
+                        <h3>Work A {selectedPair.work_id_a === id && '(Current)'}</h3>
+                        {selectedPair.work_id_a !== id && (
+                          <button
+                            type="button"
+                            className="btn primary"
+                            style={{ fontSize: '13px', padding: '4px 10px' }}
+                            onClick={() => jumpToWork(selectedPair.work_id_a)}
+                          >
+                            Open This Work
+                          </button>
+                        )}
+                      </div>
+                      <dl className="facts">
+                        <div><dt>Work ID</dt><dd className="id">{selectedPair.work_id_a}</dd></div>
+                        <div><dt>Category</dt><dd>{selectedPair.work_category || '–'}</dd></div>
+                        <div><dt>Sanction Amount</dt><dd>{inr(selectedPair.sanction_amount_a)}</dd></div>
+                        <div><dt>Sanction Date</dt><dd>{selectedPair.sanction_date_a || '–'}</dd></div>
+                      </dl>
+                      <div className="work-desc-box">
+                        <strong>Work Description:</strong>
+                        <p>{selectedPair.description_a || 'No description available.'}</p>
+                      </div>
+                    </div>
+
+                    <div className="compare-card">
+                      <div className="compare-card-header">
+                        <h3>Work B {selectedPair.work_id_b === id && '(Current)'}</h3>
+                        {selectedPair.work_id_b !== id && (
+                          <button
+                            type="button"
+                            className="btn primary"
+                            style={{ fontSize: '13px', padding: '4px 10px' }}
+                            onClick={() => jumpToWork(selectedPair.work_id_b)}
+                          >
+                            Open This Work
+                          </button>
+                        )}
+                      </div>
+                      <dl className="facts">
+                        <div><dt>Work ID</dt><dd className="id">{selectedPair.work_id_b}</dd></div>
+                        <div><dt>Category</dt><dd>{selectedPair.work_category || '–'}</dd></div>
+                        <div><dt>Sanction Amount</dt><dd>{inr(selectedPair.sanction_amount_b)}</dd></div>
+                        <div><dt>Sanction Date</dt><dd>{selectedPair.sanction_date_b || '–'}</dd></div>
+                      </dl>
+                      <div className="work-desc-box">
+                        <strong>Work Description:</strong>
+                        <p>{selectedPair.description_b || 'No description available.'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedPair.reasons.length > 0 && (
+                    <div className="reasons-section">
+                      <strong>Flagged Evidence Reasons:</strong>
+                      <ul className="reasons-list">
+                        {selectedPair.reasons.map((reason, idx) => <li key={idx}>{reason}</li>)}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="dup-disclaimer">
+                    <strong>Regulatory Review Disclaimer:</strong> Potential Duplicate Risk Scores highlight similarity and proximity patterns for human verification. They do not establish that any irregularity or intentional duplication has occurred.
+                  </div>
+                </div>
+
+                <footer className="modal-footer">
+                  <button type="button" className="btn" onClick={() => setSelectedPair(null)}>Close Inspection</button>
+                </footer>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
