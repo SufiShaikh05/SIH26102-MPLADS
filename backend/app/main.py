@@ -29,6 +29,8 @@ from .models import (
     ReviewInfo,
     StateList,
     SummaryResponse,
+    TrendPoint,
+    TrendResponse,
     WorkDetail,
 )
 from .services.anomaly_service import (
@@ -45,6 +47,7 @@ from .services.data_service import (
     normalize_work_id,
 )
 from .services.summary_service import SummaryService
+from .services.trend_service import TrendService
 
 log = logging.getLogger("uvicorn.error.mplads")
 
@@ -61,6 +64,7 @@ class Context:
     works: WorkStore
     anomalies: AnomalyStore
     summary: SummaryService
+    trends: TrendService
 
 
 def _not_found(work_id: str) -> HTTPException:
@@ -212,6 +216,22 @@ def build_router(ctx: Context) -> APIRouter:
         """Work categories with work counts (and review-candidate counts once anomaly data exists)."""
         return ctx.summary.categories()
 
+    @router.get(
+        "/trends",
+        response_model=TrendResponse,
+        tags=["trends"],
+        summary="Monthly Trend Intelligence",
+        description="Event-based monthly trends for implementation milestones and expenditure.",
+    )
+    def get_trends(
+        state: Annotated[
+            str | None,
+            Query(description="Exact state name to filter trends. When omitted, returns national trends."),
+        ] = None,
+    ):
+        """Event-based monthly trends for recommended, sanctioned, completed works and expenditure."""
+        return ctx.trends.get_trends(state=state)
+
     return router
 
 
@@ -219,7 +239,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     works = WorkStore(settings)
     anomalies = AnomalyStore(settings, works)
-    ctx = Context(settings, works, anomalies, SummaryService(settings, works, anomalies))
+    trends = TrendService(settings)
+    ctx = Context(
+        settings, works, anomalies, SummaryService(settings, works, anomalies), trends
+    )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -228,6 +251,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             works.ensure_loaded()
             anomalies.data()
+            trends.ensure_loaded()
         except DataUnavailableError as exc:
             log.warning("Startup: %s", exc)
         except Exception:

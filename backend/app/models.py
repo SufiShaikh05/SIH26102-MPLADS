@@ -264,3 +264,31 @@ class WorkDetail(BaseModel):
         "has no record for this work; unavailable: no anomaly data is loaded."
     )
     review: ReviewInfo | None = None
+
+
+# --------------------------------------------------------------------------- trends
+class TrendPoint(BaseModel):
+    period: str = Field(description="Period in YYYY-MM format.")
+    recommended_works: int = Field(default=0, description="Works recommended in this month.")
+    sanctioned_works: int = Field(default=0, description="Works sanctioned in this month.")
+    completed_works: int = Field(default=0, description="Works completed in this month.")
+    expenditure_transactions: int = Field(default=0, description="Expenditure transactions occurring in this month.")
+    expenditure_amount: float = Field(default=0.0, description="Total expenditure amount disbursed in this month.")
+    payment_success_amount: float = Field(
+        default=0.0, description="Disbursed amount with payment_status 'Payment Success'."
+    )
+    payment_in_progress_amount: float = Field(
+        default=0.0, description="Disbursed amount with payment_status 'Payment In-Progress'."
+    )
+
+
+class TrendResponse(BaseModel):
+    granularity: Literal["month"] = "month"
+    start_period: str | None = Field(
+        default=None, description="Earliest period in YYYY-MM format, or null when series is empty."
+    )
+    end_period: str | None = Field(
+        default=None, description="Latest period in YYYY-MM format, or null when series is empty."
+    )
+    state: str | None = Field(default=None, description="State filtered on, or null for national trends.")
+    series: list[TrendPoint] = Field(default_factory=list, description="Chronological monthly trend series.")
