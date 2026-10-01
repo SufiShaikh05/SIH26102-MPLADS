@@ -38,6 +38,8 @@ WORKS_MASTER_FILE = "works_master.csv"
 EXPENDITURE_BY_WORK_FILE = "expenditure_by_work.csv"
 ANOMALIES_FILE = "work_anomalies_v1.csv"
 DEMO_ANOMALIES_FILE = "work_anomalies_v1.demo.csv"
+DUPLICATE_PAIRS_FILE = "potential_duplicate_pairs_v1.csv"
+DUPLICATE_CLUSTERS_FILE = "potential_duplicate_clusters_v1.csv"
 
 # Any local dev server (React, Vite, Next, Angular, python -m http.server ...) on any port.
 LOCALHOST_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$"
@@ -95,6 +97,14 @@ class Settings:
     @property
     def demo_anomalies_path(self) -> Path:
         return self.demo_dir / DEMO_ANOMALIES_FILE
+
+    @property
+    def duplicate_pairs_path(self) -> Path:
+        return self.processed_dir / DUPLICATE_PAIRS_FILE
+
+    @property
+    def duplicate_clusters_path(self) -> Path:
+        return self.processed_dir / DUPLICATE_CLUSTERS_FILE
 
     def display(self, path: Path) -> str:
         """Repo-relative path for messages (never leaks the absolute user path)."""

@@ -32,6 +32,11 @@ from .models import (
     TrendPoint,
     TrendResponse,
     WorkDetail,
+    DuplicateClusterRecord,
+    DuplicatePage,
+    DuplicatePairRecord,
+    DuplicateSummary,
+    WorkDuplicatesResponse,
 )
 from .services.anomaly_service import (
     AnomalyStore,
@@ -46,6 +51,7 @@ from .services.data_service import (
     is_valid_work_id,
     normalize_work_id,
 )
+from .services.duplicate_service import DuplicateService
 from .services.summary_service import SummaryService
 from .services.trend_service import TrendService
 
@@ -65,6 +71,7 @@ class Context:
     anomalies: AnomalyStore
     summary: SummaryService
     trends: TrendService
+    duplicates: DuplicateService
 
 
 def _not_found(work_id: str) -> HTTPException:
@@ -232,6 +239,55 @@ def build_router(ctx: Context) -> APIRouter:
         """Event-based monthly trends for recommended, sanctioned, completed works and expenditure."""
         return ctx.trends.get_trends(state=state)
 
+    @router.get(
+        "/duplicates",
+        response_model=DuplicatePage,
+        tags=["duplicates"],
+        summary="Potential Duplicate Work Candidates",
+        description="Paginated list of potential duplicate work pairs with explainable risk scores and evidence reasons.",
+    )
+    def list_duplicates(
+        page: Annotated[int, Query(ge=1, description="1-based page number")] = 1,
+        page_size: Annotated[int, Query(ge=1, le=100, description="Items per page (max 100)")] = 25,
+        state: Annotated[str | None, Query(description="Filter by state")] = None,
+        constituency: Annotated[str | None, Query(description="Filter by parliamentary constituency")] = None,
+        priority: Annotated[str | None, Query(description="Filter by review priority (e.g. high, medium, low)")] = None,
+        is_batch: Annotated[bool | None, Query(description="Filter for batch scheme pairs (true/false)")] = None,
+        min_score: Annotated[float | None, Query(ge=0.0, le=100.0, description="Minimum duplicate risk score")] = None,
+        sort_by: Annotated[str, Query(description="Sort order: score_desc, score_asc, amount_desc, date_gap_asc")] = "score_desc",
+    ):
+        return ctx.duplicates.query(
+            page=page,
+            page_size=page_size,
+            state=state,
+            constituency=constituency,
+            priority=priority,
+            is_batch=is_batch,
+            min_score=min_score,
+            sort_by=sort_by,
+        )
+
+    @router.get(
+        "/duplicates/summary",
+        response_model=DuplicateSummary,
+        tags=["duplicates"],
+        summary="Duplicate Detection Summary",
+        description="Aggregate metrics on potential duplicate works, clusters, and batch schemes.",
+    )
+    def duplicate_summary():
+        return ctx.duplicates.summary()
+
+    @router.get(
+        "/duplicates/{work_id:path}",
+        response_model=WorkDuplicatesResponse,
+        tags=["duplicates"],
+        summary="Duplicate Records for a Work",
+        description="Returns duplicate pairs and cluster memberships associated with a specific Work ID.",
+    )
+    def get_work_duplicates(work_id: str):
+        work_id = resolve_work_id(ctx, work_id)
+        return ctx.duplicates.get_for_work(work_id)
+
     return router
 
 
@@ -240,8 +296,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     works = WorkStore(settings)
     anomalies = AnomalyStore(settings, works)
     trends = TrendService(settings)
+    duplicates = DuplicateService(settings, works)
     ctx = Context(
-        settings, works, anomalies, SummaryService(settings, works, anomalies), trends
+        settings, works, anomalies, SummaryService(settings, works, anomalies), trends, duplicates
     )
 
     @asynccontextmanager
@@ -252,6 +309,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             works.ensure_loaded()
             anomalies.data()
             trends.ensure_loaded()
+            duplicates.ensure_loaded()
         except DataUnavailableError as exc:
             log.warning("Startup: %s", exc)
         except Exception:

@@ -292,3 +292,63 @@ class TrendResponse(BaseModel):
     )
     state: str | None = Field(default=None, description="State filtered on, or null for national trends.")
     series: list[TrendPoint] = Field(default_factory=list, description="Chronological monthly trend series.")
+
+
+# --------------------------------------------------------------------------- duplicates
+class DuplicatePairRecord(BaseModel):
+    pair_id: str
+    work_id_a: str
+    work_id_b: str
+    cluster_id: str | None = None
+    state: str | None = None
+    constituency: str | None = None
+    mp_name: str | None = None
+    work_category: str | None = None
+    description_a: str | None = None
+    description_b: str | None = None
+    sanction_amount_a: float | None = None
+    sanction_amount_b: float | None = None
+    amount_difference_pct: float | None = None
+    sanction_date_a: str | None = None
+    sanction_date_b: str | None = None
+    date_gap_days: int | None = None
+    text_similarity: float
+    shared_entity_tokens: list[str] = Field(default_factory=list)
+    duplicate_risk_score: float
+    review_priority: str
+    is_batch_scheme: bool
+    batch_frequency: int = 0
+    consecutive_serials: bool
+    reasons: list[str] = Field(default_factory=list)
+    explanation_text: str
+
+
+class DuplicateClusterRecord(BaseModel):
+    cluster_id: str
+    work_count: int
+    is_batch_scheme: bool
+    work_ids: list[str] = Field(default_factory=list)
+
+
+class DuplicateSummary(BaseModel):
+    total_duplicate_pairs: int
+    high_confidence_pairs: int
+    medium_confidence_pairs: int
+    batch_scheme_pairs: int
+    total_clusters: int
+    affected_works_count: int
+
+
+class DuplicatePage(BaseModel):
+    items: list[DuplicatePairRecord]
+    total: int
+    page: int
+    page_size: int
+
+
+class WorkDuplicatesResponse(BaseModel):
+    work_id: str
+    has_duplicates: bool
+    duplicate_pairs: list[DuplicatePairRecord] = Field(default_factory=list)
+    cluster_id: str | None = None
+    cluster_work_ids: list[str] = Field(default_factory=list)

@@ -62,9 +62,12 @@ cmd.exe: `set MPLADS_USE_DEMO_ANOMALIES=1`.
 | File | Needed? | Used for |
 |---|---|---|
 | `work_features_v0.csv` | **required** | the backbone: identity, amounts, ratios, counts, timing, peer groups, summary figures, state/category lists |
-| `works_master.csv` | optional | work type, recommended date, sanction date |
+| `works_master.csv` | optional | work type, recommended date, sanction date, and trend milestone counts |
 | `expenditure_by_work.csv` | optional | first / last payment date |
+| `expenditure_transactions.csv` | optional | monthly expenditure trends and transaction volumes |
 | `work_anomalies_v1.csv` | optional (until the engine ships) | review priority score, label, signals, explanation |
+| `potential_duplicate_pairs_v1.csv` | optional | potential duplicate work pairs, risk scores, evidence reasons, and batch indicators |
+| `potential_duplicate_clusters_v1.csv` | optional | high-confidence duplicate work clusters and batch scheme sets |
 
 Only the columns the API serves are kept in memory (60 of the 63 feature columns, and just the type / date columns of the other two files).
 If `work_features_v0.csv` is missing, `/health` still answers and every data endpoint returns
@@ -104,6 +107,10 @@ made-up placeholder.
 | GET | `/api/v1/works/{work_id}` | one work: identity, money, payments, timeline, peers, review |
 | GET | `/api/v1/states` | states with counts |
 | GET | `/api/v1/work-categories` | work categories with counts |
+| GET | `/api/v1/trends` | monthly event-based milestone & expenditure trends |
+| GET | `/api/v1/duplicates` | paginated, filterable list of potential duplicate work pairs |
+| GET | `/api/v1/duplicates/summary` | aggregate summary of duplicate pairs, clusters, and batch schemes |
+| GET | `/api/v1/duplicates/{work_id}` | potential duplicate pairs and clusters for a specific work ID |
 
 ### 4.1 `GET /api/v1/summary`
 
@@ -532,6 +539,144 @@ follows the candidate rule and is `null` when no anomaly data is available.
 {
   "detail": "Invalid work_id 'abc'. Expected PREFIX/MPCODE/YYYY-YYYY/SERIAL, for example WS/MP005/2024-2025/145074."
 }
+### 4.8 `GET /api/v1/trends`
+
+Event-based monthly trends for implementation milestones and expenditure. Aggregates timestamps directly from `works_master.csv` (`recommended_date`, `sanction_date`, `completed_date`) and `expenditure_transactions.csv` (`payment_date`, `amount`, `payment_status`).
+
+**Query parameters**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `state` | string | `null` | Exact state name (e.g. `Bihar`). When omitted, aggregates all states nationwide. |
+
+```json
+{
+  "granularity": "month",
+  "start_period": "2023-04",
+  "end_period": "2025-09",
+  "state": "Bihar",
+  "series": [
+    {
+      "period": "2024-06",
+      "recommended_works": 42,
+      "sanctioned_works": 38,
+      "completed_works": 12,
+      "expenditure_transactions": 85,
+      "expenditure_amount": 14500000.0,
+      "payment_success_amount": 14200000.0,
+      "payment_in_progress_amount": 300000.0
+    }
+  ]
+}
+```
+
+### 4.9 `GET /api/v1/duplicates`
+
+Paginated, filterable list of potential duplicate work pairs identified by Sentinel 2.0. Every pair is scored on an explainable `0.0–100.0` bounded risk scale and accompanied by clear evidence reasons and non-accusatory review guidance.
+
+**Query parameters**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `page` | integer >= 1 | `1` | Page number |
+| `page_size` | integer 1..100 | `25` | Page size |
+| `state` | string | `null` | Exact state filter |
+| `constituency` | string | `null` | Exact constituency filter |
+| `priority` | string | `null` | `High`, `Medium`, `Low`, or `High-Confidence Potential Duplicate` |
+| `is_batch` | boolean | `null` | Filter for batch scheme pairs (`true` / `false`) |
+| `min_score` | float 0..100 | `null` | Minimum duplicate risk score |
+| `sort_by` | string | `score_desc` | `score_desc`, `score_asc`, `amount_desc`, `date_gap_asc` |
+
+```json
+{
+  "items": [
+    {
+      "pair_id": "DUP-151021-151022",
+      "work_id_a": "WS/MP013/2024-2025/151021",
+      "work_id_b": "WS/MP013/2024-2025/151022",
+      "cluster_id": "CLUST-00637",
+      "state": "Sikkim",
+      "constituency": "Sikkim",
+      "mp_name": "Indra Hang Subba",
+      "work_category": "Others",
+      "description_a": "Construction of road from Namphing to lower Namphing GPU in South Sikkim",
+      "description_b": "Construction of road from Namphing to lower Namphing GPU in South Sikkim",
+      "sanction_amount_a": 1000000.0,
+      "sanction_amount_b": 1000000.0,
+      "amount_difference_pct": 0.0,
+      "sanction_date_a": "2024-07-15",
+      "sanction_date_b": "2024-07-15",
+      "date_gap_days": 0,
+      "consecutive_serials": 1,
+      "duplicate_risk_score": 100.0,
+      "review_priority": "High-Confidence Potential Duplicate",
+      "reasons": [
+        "Identical or near-identical work description (similarity 1.00)",
+        "Matching financial sanction amounts",
+        "Sanctions approved on identical or near-identical dates",
+        "Consecutive serial numbers (151021 / 151022)",
+        "Both works in same constituency (Sikkim)"
+      ],
+      "shared_entity_tokens": ["gpu", "namphing", "lower", "south", "sikkim"],
+      "is_batch_scheme": false,
+      "batch_frequency": 2,
+      "batch_scheme_reason": null,
+      "explanation_text": "Review recommended because identical or near-identical work description (similarity 1.00); matching financial sanction amounts; sanctions approved on identical or near-identical dates; consecutive serial numbers (151021 / 151022); both works in same constituency (sikkim). This indicates potential duplicate entry or overlapping scope that may warrant verification and does not establish wrongdoing."
+    }
+  ],
+  "total": 56504,
+  "page": 1,
+  "page_size": 25,
+  "pages": 2261
+}
+```
+
+### 4.10 `GET /api/v1/duplicates/summary`
+
+Aggregate summary metrics for duplicate review candidates, multi-work clusters, and batch schemes.
+
+```json
+{
+  "total_duplicate_pairs": 56504,
+  "high_confidence_pairs": 16661,
+  "medium_confidence_pairs": 39616,
+  "batch_scheme_pairs": 227,
+  "total_clusters": 3232,
+  "works_in_clusters": 7180,
+  "data_available": true
+}
+```
+
+### 4.11 `GET /api/v1/duplicates/{work_id}`
+
+Retrieves all duplicate pairs and cluster memberships associated with a specific Work ID.
+
+```json
+{
+  "work_id": "WS/MP013/2024-2025/151021",
+  "duplicate_pair_count": 1,
+  "pairs": [
+    {
+      "pair_id": "DUP-151021-151022",
+      "work_id_a": "WS/MP013/2024-2025/151021",
+      "work_id_b": "WS/MP013/2024-2025/151022",
+      "cluster_id": "CLUST-00637",
+      "duplicate_risk_score": 100.0,
+      "review_priority": "High-Confidence Potential Duplicate",
+      "is_batch_scheme": false,
+      "explanation_text": "Review recommended because identical or near-identical work description (similarity 1.00); matching financial sanction amounts; sanctions approved on identical or near-identical dates; consecutive serial numbers (151021 / 151022); both works in same constituency (sikkim). This indicates potential duplicate entry or overlapping scope that may warrant verification and does not establish wrongdoing."
+    }
+  ],
+  "cluster": {
+    "cluster_id": "CLUST-00637",
+    "work_count": 2,
+    "is_batch_scheme": false,
+    "work_ids": [
+      "WS/MP013/2024-2025/151021",
+      "WS/MP013/2024-2025/151022"
+    ]
+  }
+}
 ```
 
 ---
@@ -569,8 +714,43 @@ missing from the file is listed in `summary.anomaly_data.missing_columns`.
   (for example half-written), the last good data keeps being served and
   `anomaly_data.message` says so. Writing to a temporary file and renaming it over
   `work_anomalies_v1.csv` avoids ever exposing a partial file.
-* `work_features_v0.csv`, `works_master.csv` and `expenditure_by_work.csv` are read at startup;
-  restart the server after rebuilding them.
+* `work_features_v0.csv`, `works_master.csv`, `expenditure_by_work.csv`, `potential_duplicate_pairs_v1.csv`, and `potential_duplicate_clusters_v1.csv` are read at startup; restart the server after rebuilding them.
+
+### 5.1 Duplicate pairs CSV: `data/processed/potential_duplicate_pairs_v1.csv`
+
+Generated by `duplicate_engine/build_duplicate_pairs.py`. Stores pairwise candidate records for potential duplicate or substantially overlapping works.
+
+| Column | Type | Description |
+|---|---|---|
+| `pair_id` | text | Unique identifier (e.g. `DUP-151021-151022`) |
+| `work_id_a`, `work_id_b` | text | Canonical Work IDs forming the candidate pair |
+| `cluster_id` | text | Connected-component cluster identifier (or empty if not in high-confidence cluster) |
+| `state`, `constituency`, `mp_name`, `work_category` | text | Geographic & administrative context from `works_master.csv` |
+| `description_a`, `description_b` | text | Official work descriptions from `works_master.csv` |
+| `sanction_amount_a`, `sanction_amount_b` | number | Financial sanction amounts (rupees) |
+| `amount_difference_pct` | number | Percentage difference between sanction amounts `|A - B| / max(A, B) * 100` |
+| `sanction_date_a`, `sanction_date_b` | text | Sanction approval dates (`YYYY-MM-DD`) |
+| `date_gap_days` | integer | Absolute calendar days between sanction dates |
+| `consecutive_serials` | integer | `1` if work ID serials are sequential ($|S_a - S_b| = 1$), else `0` |
+| `duplicate_risk_score` | number | Bounded normalized risk score (`0.0` to `100.0`) |
+| `review_priority` | text | `High-Confidence Potential Duplicate`, `Medium-Confidence Potential Duplicate`, or `Low-Confidence Review Candidate` |
+| `reasons` | text | Semicolon-separated human-readable evidence reasons |
+| `shared_entity_tokens` | text | Semicolon-separated shared geographic/facility tokens |
+| `is_batch_scheme` | integer | `1` if classified as an intentional multi-location batch scheme, else `0` |
+| `batch_frequency` | integer | Template repetition frequency within constituency / nationwide |
+| `batch_scheme_reason` | text | Reason for batch classification (or empty) |
+| `explanation_text` | text | Comprehensive explanation ending with standard neutral review disclaimer |
+
+### 5.2 Duplicate clusters CSV: `data/processed/potential_duplicate_clusters_v1.csv`
+
+Stores connected-component clusters formed strictly from high-confidence edges to group multi-work duplicate sets without transitive chaining drift.
+
+| Column | Type | Description |
+|---|---|---|
+| `cluster_id` | text | Identifier (e.g. `CLUST-00637`) |
+| `work_count` | integer | Number of works in the cluster (bounded $\le 30$) |
+| `is_batch_scheme` | integer | `1` if the cluster represents a batch scheme |
+| `work_ids` | text | Semicolon-separated list of canonical Work IDs |
 
 ---
 
