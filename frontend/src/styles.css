@@ -64,3 +64,24 @@ tbody tr{cursor:pointer}tbody tr:hover,tbody tr:focus-visible{background:var(--a
 @media(max-width:900px){.cards{grid-template-columns:repeat(2,1fr)}.grid2,.dgrid{grid-template-columns:1fr}}
 @media(max-width:520px){.bars li,.bars.wide li{grid-template-columns:110px 1fr auto}.big{font-size:30px}}
 @media(prefers-reduced-motion:reduce){.spinner{animation:none}}
+
+/* Implementation Trends */
+.trend-controls{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px}
+.trend-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.trend-scope-select{display:flex;align-items:center}
+.trend-cards{grid-template-columns:repeat(5,1fr);margin-bottom:14px}
+.trend-chart-container{position:relative;margin-top:6px}
+.trend-legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:13px;font-weight:600}
+.trend-legend-item{display:flex;align-items:center;gap:6px}
+.trend-legend-swatch{width:10px;height:10px;border-radius:50%;display:inline-block}
+.trend-svg-wrap{width:100%;overflow-x:auto;background:#fafbfc;border:1px solid var(--line);border-radius:4px;padding:8px 0}
+.trend-svg{width:100%;min-width:640px;height:auto;display:block}
+.trend-tooltip-card{margin-top:10px;padding:10px 14px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:4px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;font-size:13px}
+.trend-tooltip-header{font-weight:650;color:var(--ink)}
+.trend-tooltip-body{display:flex;gap:16px;flex-wrap:wrap}
+.trend-tooltip-row{display:flex;align-items:center;gap:6px}
+.trend-tooltip-name{color:var(--muted);display:flex;align-items:center;gap:5px}
+.trend-tooltip-val{font-variant-numeric:tabular-nums;color:var(--ink)}
+.trend-tooltip-exact{color:var(--muted);font-weight:normal;font-size:12px}
+@media(max-width:1080px){.trend-cards{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:640px){.trend-cards{grid-template-columns:repeat(2,1fr)}.trend-controls{flex-direction:column;align-items:flex-start}}

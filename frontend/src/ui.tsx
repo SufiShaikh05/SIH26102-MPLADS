@@ -6,6 +6,17 @@ export const inr = (n?: number | null) => {
   if (Math.abs(n) >= 1e5) return `₹${(n / 1e5).toFixed(2)} L`
   return `₹${Math.round(n).toLocaleString('en-IN')}`
 }
+export const inrExact = (n?: number | null) => {
+  if (n == null || isNaN(n)) return '–'
+  return `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+export const formatPeriod = (p?: string | null) => {
+  if (!p) return '–'
+  const [y, m] = p.split('-')
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const mi = parseInt(m, 10) - 1
+  return months[mi] ? `${months[mi]} ${y}` : p
+}
 export const pct = (r?: number | null) => (r == null || isNaN(r) ? '–' : `${(r * 100).toFixed(0)}%`)
 export const num = (n?: number | null) => (n == null || isNaN(n) ? '–' : n.toLocaleString('en-IN'))
 export const signalText = (s?: string | null) => (s ? s.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase()) : '')

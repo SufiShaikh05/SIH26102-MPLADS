@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { api, sortParam, type Query } from './api/client'
+import ImplementationTrends from './ImplementationTrends'
 import { Bars, Card, Chip, Empty, ErrorBox, Loading, PRIORITY_LABELS, inr, num, pct, priorityRank, tone, useAsync } from './ui'
 
 const PAGE_SIZE = 15
@@ -69,6 +70,7 @@ export default function Dashboard({ open }: { open: (id: string) => void }) {
   return (
     <>
       <Overview />
+      <ImplementationTrends />
       <Card title="Review Candidates" note="Highest Review Priority first by default">
         <div className="filters">
           <form onSubmit={submit} className="search">

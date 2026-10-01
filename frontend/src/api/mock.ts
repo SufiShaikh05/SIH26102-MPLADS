@@ -1,6 +1,5 @@
-// DEVELOPMENT FALLBACK ONLY. Loaded when VITE_USE_MOCK=true. Matches the API contract; all values are synthetic.
 import { ApiError } from './client'
-import type { Anomaly, Page, Query, StateBreakdown, Summary } from './client'
+import type { Anomaly, Page, Query, StateBreakdown, Summary, TrendPoint, TrendResponse } from './client'
 
 let seed = 7
 const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
@@ -66,3 +65,53 @@ export const anomaly = (id: string): Promise<Anomaly> => {
 export const work = (id: string) => anomaly(id)
 export const states = () => wait(STATES)
 export const categories = () => wait(CATS)
+
+const PERIODS = [
+  '2024-07', '2024-08', '2024-09', '2024-10', '2024-11', '2024-12',
+  '2025-01', '2025-02', '2025-03', '2025-04', '2025-05', '2025-06',
+  '2025-07', '2025-08', '2025-09', '2025-10', '2025-11', '2025-12',
+  '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06',
+  '2026-07', '2026-08', '2026-09',
+]
+
+export const trends = (state?: string): Promise<TrendResponse> => {
+  if (state && !STATES.includes(state)) {
+    return wait({
+      granularity: 'month',
+      start_period: null,
+      end_period: null,
+      state,
+      series: [],
+    })
+  }
+
+  const scale = state ? 0.08 : 1.0
+  const series: TrendPoint[] = PERIODS.map((period, idx) => {
+    const rec = Math.round((1000 + idx * 150) * scale)
+    const san = Math.round((800 + idx * 170) * scale)
+    const com = Math.round((300 + idx * 120) * scale)
+    const tx = Math.round((900 + idx * 200) * scale)
+    const succAmt = Math.round((2.8e8 + idx * 7.5e7) * scale)
+    const inProgAmt = Math.round((2e7 + idx * 5e6) * scale)
+    const expAmt = succAmt + inProgAmt
+
+    return {
+      period,
+      recommended_works: rec,
+      sanctioned_works: san,
+      completed_works: com,
+      expenditure_transactions: tx,
+      expenditure_amount: expAmt,
+      payment_success_amount: succAmt,
+      payment_in_progress_amount: inProgAmt,
+    }
+  })
+
+  return wait({
+    granularity: 'month',
+    start_period: PERIODS[0],
+    end_period: PERIODS[PERIODS.length - 1],
+    state: state ?? null,
+    series,
+  })
+}

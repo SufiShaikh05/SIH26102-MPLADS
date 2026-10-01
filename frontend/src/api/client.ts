@@ -17,6 +17,23 @@ export interface Summary {
   review_priority_label_counts?: PriorityLabelCount[]
 }
 export interface StateBreakdown { state: string; work_count: number; review_candidate_count: number }
+export interface TrendPoint {
+  period: string
+  recommended_works: number
+  sanctioned_works: number
+  completed_works: number
+  expenditure_transactions: number
+  expenditure_amount: number
+  payment_success_amount: number
+  payment_in_progress_amount: number
+}
+export interface TrendResponse {
+  granularity: 'month'
+  start_period: string | null
+  end_period: string | null
+  state: string | null
+  series: TrendPoint[]
+}
 export interface Page<T> { items: T[]; total: number; page: number; page_size: number }
 export interface Query {
   page: number; page_size: number; label?: string; state?: string
@@ -74,4 +91,9 @@ export const api = {
   categories: async (): Promise<string[]> => isMock ? (await mock()).categories() : toList(await get('/api/v1/work-categories')),
   // Same /api/v1/states response as `states`, kept as the full { state, work_count, review_candidate_count } records for the chart.
   stateBreakdown: async (): Promise<StateBreakdown[]> => isMock ? (await mock()).stateBreakdown() : toStateBreakdown(await get('/api/v1/states')),
+  trends: async (state?: string): Promise<TrendResponse> => {
+    const params: Record<string, string> = {}
+    if (state && state.trim()) params.state = state.trim()
+    return isMock ? (await mock()).trends(params.state) : get<TrendResponse>('/api/v1/trends', params)
+  },
 }
