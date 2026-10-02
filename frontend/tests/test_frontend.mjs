@@ -135,3 +135,44 @@ test('Live API: Trend intelligence & Anomaly endpoints still functional (no regr
   const anomalies = await anomaliesRes.json()
   assert.equal(anomalies.items.length, 5)
 })
+
+// 4. UI Presentation & Safe Terminology Regression Test
+test('UI Presentation: safe terminology and card hierarchy are strictly enforced', async () => {
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+  const reviewSrc = fs.readFileSync(path.resolve('src/DuplicateReview.tsx'), 'utf-8')
+  const workDetailSrc = fs.readFileSync(path.resolve('src/WorkDetail.tsx'), 'utf-8')
+  const cssSrc = fs.readFileSync(path.resolve('src/styles.css'), 'utf-8')
+
+  // Check required safe terminology
+  assert.ok(reviewSrc.includes('Ordinary Review Pairs'), 'Must include "Ordinary Review Pairs"')
+  assert.ok(reviewSrc.includes('Medium-Confidence Potential Pairs'), 'Must include "Medium-Confidence Potential Pairs"')
+  assert.ok(reviewSrc.includes('Below High-Confidence gate'), 'Must include "Below High-Confidence gate"')
+  assert.ok(reviewSrc.includes('Potential Duplicate Clusters'), 'Must include "Potential Duplicate Clusters"')
+  assert.ok(reviewSrc.includes('Built from high-confidence similarity links'), 'Must include "Built from high-confidence similarity links"')
+  assert.ok(reviewSrc.includes('Batch Pattern Links'), 'Must include "Batch Pattern Links"')
+  assert.ok(reviewSrc.includes('Score ≥80 + all strict gates'), 'Must include "Score ≥80 + all strict gates"')
+  assert.ok(reviewSrc.includes('Does not satisfy the High-Confidence conjunction'), 'Must include "Does not satisfy the High-Confidence conjunction"')
+  assert.ok(
+    reviewSrc.includes('These records show repeated patterns across multiple works and are separated from the ordinary review queue to prevent repetitive patterns from dominating individual-work review.'),
+    'Must include exact batch explanation banner'
+  )
+  assert.ok(reviewSrc.includes('Data snapshot: 25 Sep 2026'), 'Must include "Data snapshot: 25 Sep 2026"')
+  assert.ok(
+    reviewSrc.includes('Metrics shown from the current processed MPLADS dataset snapshot.'),
+    'Must include "Metrics shown from the current processed MPLADS dataset snapshot."'
+  )
+
+  // Check prohibited words
+  const prohibited = ['fraud probability', 'confirmed duplicate', 'fraudulent work', 'fraudulent scheme', 'proven duplication']
+  for (const term of prohibited) {
+    assert.ok(!reviewSrc.toLowerCase().includes(term), `Review source must not contain prohibited term: "${term}"`)
+    assert.ok(!workDetailSrc.toLowerCase().includes(term), `WorkDetail source must not contain prohibited term: "${term}"`)
+  }
+
+  // Check CSS hierarchy & responsive rules
+  assert.ok(cssSrc.includes('.stat-value'), 'CSS must include .stat-value')
+  assert.ok(cssSrc.includes('.stat-help'), 'CSS must include .stat-help')
+  assert.ok(cssSrc.includes('.modal-metric-card'), 'CSS must include .modal-metric-card')
+  assert.ok(cssSrc.includes('.metric-sublabel'), 'CSS must include .metric-sublabel')
+})

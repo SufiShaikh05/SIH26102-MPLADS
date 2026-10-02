@@ -20,7 +20,7 @@ interface DuplicateReviewProps {
 }
 
 export default function DuplicateReview({ openWork }: DuplicateReviewProps) {
-  // Mode: Ordinary Review Queue (false) vs Batch Scheme Templates (true)
+  // Mode: Ordinary Review Queue (false) vs Batch Pattern Links (true)
   const [isBatch, setIsBatch] = useState(false)
   const [page, setPage] = useState(1)
   const [stateFilter, setStateFilter] = useState('')
@@ -105,6 +105,12 @@ export default function DuplicateReview({ openWork }: DuplicateReviewProps) {
 
   return (
     <div className="dup-review-view">
+      {/* Data Snapshot Metadata */}
+      <div className="dup-meta-bar">
+        <span>Data snapshot: 25 Sep 2026</span>
+        <span className="muted">&bull; Metrics shown from the current processed MPLADS dataset snapshot.</span>
+      </div>
+
       {/* 1. Summary Metrics Cards */}
       {summary.loading && !d ? (
         <Loading text="Loading duplicate detection summary…" />
@@ -113,34 +119,34 @@ export default function DuplicateReview({ openWork }: DuplicateReviewProps) {
       ) : d ? (
         <div className="cards dup-summary-cards">
           <div className="stat key">
-            <span>Ordinary Pairs</span>
-            <strong>{num(d.total_duplicate_pairs)}</strong>
-            <small className="muted">Excludes batch links</small>
+            <span className="stat-label">Ordinary Review Pairs</span>
+            <strong className="stat-value">{num(d.total_duplicate_pairs)}</strong>
+            <span className="stat-help muted">Batch-pattern links excluded</span>
           </div>
           <div className="stat">
-            <span style={{ color: 'var(--high)' }}>High-Confidence Pairs</span>
-            <strong style={{ color: 'var(--high)' }}>{num(d.high_confidence_pairs)}</strong>
-            <small className="muted">Score ≥ 80 &amp; strict gates</small>
+            <span className="stat-label" style={{ color: 'var(--high)' }}>High-Confidence Pairs</span>
+            <strong className="stat-value" style={{ color: 'var(--high)' }}>{num(d.high_confidence_pairs)}</strong>
+            <span className="stat-help muted">Score ≥80 + all strict gates</span>
+          </div>
+          <div className="stat" title="Below High-Confidence gate">
+            <span className="stat-label" style={{ color: 'var(--medium)' }}>Medium-Confidence Potential Pairs</span>
+            <strong className="stat-value" style={{ color: 'var(--medium)' }}>{num(d.medium_confidence_pairs)}</strong>
+            <span className="stat-help muted" title="Below High-Confidence gate">Does not satisfy the High-Confidence conjunction</span>
           </div>
           <div className="stat">
-            <span style={{ color: 'var(--medium)' }}>Medium-Confidence Pairs</span>
-            <strong style={{ color: 'var(--medium)' }}>{num(d.medium_confidence_pairs)}</strong>
-            <small className="muted">Substantial similarity</small>
+            <span className="stat-label" style={{ color: 'var(--accent)' }}>Batch Pattern Links</span>
+            <strong className="stat-value" style={{ color: 'var(--accent)' }}>{num(d.batch_scheme_pairs)}</strong>
+            <span className="stat-help muted">Isolated from ordinary review</span>
           </div>
           <div className="stat">
-            <span style={{ color: 'var(--accent)' }}>Batch Scheme Links</span>
-            <strong style={{ color: 'var(--accent)' }}>{num(d.batch_scheme_pairs)}</strong>
-            <small className="muted">Isolated templates</small>
+            <span className="stat-label">Potential Duplicate Clusters</span>
+            <strong className="stat-value">{num(d.total_clusters)}</strong>
+            <span className="stat-help muted">Built from high-confidence similarity links</span>
           </div>
           <div className="stat">
-            <span>Clusters Formed</span>
-            <strong>{num(d.total_clusters)}</strong>
-            <small className="muted">High-confidence edges</small>
-          </div>
-          <div className="stat">
-            <span>Affected Works</span>
-            <strong>{num(d.affected_works_count)}</strong>
-            <small className="muted">Total works involved</small>
+            <span className="stat-label">Affected Works</span>
+            <strong className="stat-value">{num(d.affected_works_count)}</strong>
+            <span className="stat-help muted">Total works involved</span>
           </div>
         </div>
       ) : null}
@@ -169,20 +175,20 @@ export default function DuplicateReview({ openWork }: DuplicateReviewProps) {
             setPriorityFilter('')
           }}
         >
-          Batch Scheme Templates ({d ? num(d.batch_scheme_pairs) : '…'})
+          Batch Pattern Links ({d ? num(d.batch_scheme_pairs) : '…'})
         </button>
       </div>
 
       {isBatch && (
         <div className="dup-batch-notice" role="note">
-          <strong>Batch Scheme Template Isolation:</strong> These {d ? num(d.batch_scheme_pairs) : ''} records represent repeated programmatic schemes (such as community solar street lights, drinking water handpumps, or boundary walls) across consecutive serial numbers. They are isolated from the ordinary human review queue to prevent template flooding.
+          <strong>Batch Pattern Links:</strong> These records show repeated patterns across multiple works and are separated from the ordinary review queue to prevent repetitive patterns from dominating individual-work review.
         </div>
       )}
 
       {/* 3. Review Candidates Panel */}
       <Card
-        title={isBatch ? 'Batch Scheme Template Representatives' : 'Potential Duplicate Work Pairs'}
-        note={isBatch ? 'Isolated repeated schemes' : 'Human review candidates ordered by risk score'}
+        title={isBatch ? 'Batch Pattern Links' : 'Potential Duplicate Work Pairs'}
+        note={isBatch ? 'Isolated repeated pattern links' : 'Human review candidates ordered by risk score'}
       >
         {/* Filters Toolbar */}
         <div className="filters">
@@ -234,7 +240,7 @@ export default function DuplicateReview({ openWork }: DuplicateReviewProps) {
                 <option value="medium">Medium-Confidence</option>
               </>
             )}
-            {isBatch && <option value="batch">Batch Scheme Link</option>}
+            {isBatch && <option value="batch">Batch Pattern Link</option>}
           </select>
 
           <input
@@ -460,28 +466,29 @@ export default function DuplicateReview({ openWork }: DuplicateReviewProps) {
             <div className="modal-body">
               {/* Score & Gate Highlights Banner */}
               <div className="modal-scoreband">
-                <div>
-                  <span className="muted">Potential Duplicate Risk Score</span>
-                  <strong className="big">{selectedPair.duplicate_risk_score.toFixed(1)}</strong>
+                <div className="modal-metric-card">
+                  <span className="metric-label">Potential Duplicate Risk Score</span>
+                  <strong className="big metric-value">{selectedPair.duplicate_risk_score.toFixed(1)}</strong>
                 </div>
-                <div>
-                  <span className="muted">Text Similarity (Trigram)</span>
-                  <strong className="big">{pctDec(selectedPair.text_similarity, 2)}</strong>
-                  <div style={{ marginTop: '4px' }}>
+                <div className="modal-metric-card">
+                  <span className="metric-label">Text Similarity</span>
+                  <span className="metric-sublabel">Trigram</span>
+                  <strong className="big metric-value">{pctDec(selectedPair.text_similarity, 2)}</strong>
+                  <div className="metric-gate-wrap">
                     <GateBadge similarity={selectedPair.text_similarity} />
                   </div>
                 </div>
-                <div>
-                  <span className="muted">Sanction Amount Difference</span>
-                  <strong className="big">
+                <div className="modal-metric-card">
+                  <span className="metric-label">Sanction Amount Difference</span>
+                  <strong className="big metric-value">
                     {selectedPair.amount_difference_pct != null
                       ? pctDec(selectedPair.amount_difference_pct, 2)
                       : '–'}
                   </strong>
                 </div>
-                <div>
-                  <span className="muted">Sanction Date Gap</span>
-                  <strong className="big">
+                <div className="modal-metric-card">
+                  <span className="metric-label">Sanction Date Gap</span>
+                  <strong className="big metric-value">
                     {selectedPair.date_gap_days != null ? `${selectedPair.date_gap_days} days` : '–'}
                   </strong>
                 </div>

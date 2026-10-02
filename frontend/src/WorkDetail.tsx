@@ -177,26 +177,27 @@ export default function WorkDetail({ id, back }: { id: string; back: () => void 
 
                 <div className="modal-body">
                   <div className="modal-scoreband">
-                    <div>
-                      <span className="muted">Risk Score</span>
-                      <strong className="big">{selectedPair.duplicate_risk_score.toFixed(1)}</strong>
+                    <div className="modal-metric-card">
+                      <span className="metric-label">Potential Duplicate Risk Score</span>
+                      <strong className="big metric-value">{selectedPair.duplicate_risk_score.toFixed(1)}</strong>
                     </div>
-                    <div>
-                      <span className="muted">Text Similarity</span>
-                      <strong className="big">{pctDec(selectedPair.text_similarity, 2)}</strong>
-                      <div style={{ marginTop: '4px' }}>
+                    <div className="modal-metric-card">
+                      <span className="metric-label">Text Similarity</span>
+                      <span className="metric-sublabel">Trigram</span>
+                      <strong className="big metric-value">{pctDec(selectedPair.text_similarity, 2)}</strong>
+                      <div className="metric-gate-wrap">
                         <GateBadge similarity={selectedPair.text_similarity} />
                       </div>
                     </div>
-                    <div>
-                      <span className="muted">Amount Difference</span>
-                      <strong className="big">
+                    <div className="modal-metric-card">
+                      <span className="metric-label">Sanction Amount Difference</span>
+                      <strong className="big metric-value">
                         {selectedPair.amount_difference_pct != null ? pctDec(selectedPair.amount_difference_pct, 2) : '–'}
                       </strong>
                     </div>
-                    <div>
-                      <span className="muted">Date Gap</span>
-                      <strong className="big">
+                    <div className="modal-metric-card">
+                      <span className="metric-label">Sanction Date Gap</span>
+                      <strong className="big metric-value">
                         {selectedPair.date_gap_days != null ? `${selectedPair.date_gap_days} days` : '–'}
                       </strong>
                     </div>
