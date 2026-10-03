@@ -37,6 +37,9 @@ from .models import (
     DuplicatePairRecord,
     DuplicateSummary,
     WorkDuplicatesResponse,
+    ComplianceQueuePage,
+    ComplianceSummary,
+    WorkComplianceRecord,
 )
 from .services.anomaly_service import (
     AnomalyStore,
@@ -51,6 +54,7 @@ from .services.data_service import (
     is_valid_work_id,
     normalize_work_id,
 )
+from .services.compliance_service import ComplianceService
 from .services.duplicate_service import DuplicateService
 from .services.summary_service import SummaryService
 from .services.trend_service import TrendService
@@ -72,6 +76,7 @@ class Context:
     summary: SummaryService
     trends: TrendService
     duplicates: DuplicateService
+    compliance: ComplianceService
 
 
 def _not_found(work_id: str) -> HTTPException:
@@ -288,6 +293,68 @@ def build_router(ctx: Context) -> APIRouter:
         work_id = resolve_work_id(ctx, work_id)
         return ctx.duplicates.get_for_work(work_id)
 
+    # ----------------------------------------------------------------------- compliance
+    @router.get(
+        "/compliance/summary",
+        response_model=ComplianceSummary,
+        tags=["compliance"],
+        summary="Compliance & Execution Risk Summary",
+        description="Aggregated review triggers, official monitoring benchmarks, execution risk alerts, and financial reconciliations.",
+    )
+    def compliance_summary():
+        return ctx.compliance.get_summary()
+
+    @router.get(
+        "/compliance/rules",
+        tags=["compliance"],
+        summary="Policy Registry & Rule Definitions",
+        description="Full policy registry metadata, governing clauses, official monitoring benchmarks, and rule definitions.",
+    )
+    def compliance_rules():
+        return ctx.compliance.get_rules_metadata()
+
+    @router.get(
+        "/compliance/queue",
+        response_model=ComplianceQueuePage,
+        tags=["compliance"],
+        summary="Compliance & Execution Risk Review Queue",
+        description="Filterable paginated review queue of works with triggered review triggers or operational risk alerts.",
+    )
+    def list_compliance_queue(
+        page: Annotated[int, Query(ge=1, description="1-based page number")] = 1,
+        limit: Annotated[int, Query(ge=1, le=100, description="Items per page (max 100)")] = 25,
+        rule_id: Annotated[str | None, Query(description="Filter by specific rule ID (e.g. COMP-01, RISK-01)")] = None,
+        authority_type: Annotated[str | None, Query(description="Filter by authority type (e.g. GUIDELINE_PROVISION, OFFICIAL_MONITORING)")] = None,
+        classification: Annotated[str | None, Query(description="Filter by classification label")] = None,
+        state: Annotated[str | None, Query(description="Filter by state (case-insensitive)")] = None,
+        work_category: Annotated[str | None, Query(description="Filter by work category")] = None,
+        search: Annotated[str | None, Query(description="Search term in work ID, description, MP, or district")] = None,
+    ):
+        return ctx.compliance.get_queue(
+            rule_id=rule_id,
+            authority_type=authority_type,
+            classification=classification,
+            state=state,
+            work_category=work_category,
+            search=search,
+            page=page,
+            limit=limit,
+        )
+
+    @router.get(
+        "/compliance/{work_id:path}",
+        response_model=WorkComplianceRecord,
+        tags=["compliance"],
+        summary="Work Compliance & Risk Profile",
+        description="Returns the full 8-rule evaluation breakdown with explainability, limitations, and verification actions for a specific Work ID.",
+    )
+    def get_work_compliance(work_id: str):
+        work_id = resolve_work_id(ctx, work_id)
+        rec = ctx.compliance.get_work(work_id)
+        if rec is None:
+            raise _not_found(work_id)
+        return rec
+
     return router
 
 
@@ -297,8 +364,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     anomalies = AnomalyStore(settings, works)
     trends = TrendService(settings)
     duplicates = DuplicateService(settings, works)
+    compliance = ComplianceService(settings, work_store=works)
     ctx = Context(
-        settings, works, anomalies, SummaryService(settings, works, anomalies), trends, duplicates
+        settings, works, anomalies, SummaryService(settings, works, anomalies), trends, duplicates, compliance
     )
 
     @asynccontextmanager
@@ -310,6 +378,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             anomalies.data()
             trends.ensure_loaded()
             duplicates.ensure_loaded()
+            compliance.ensure_loaded()
         except DataUnavailableError as exc:
             log.warning("Startup: %s", exc)
         except Exception:

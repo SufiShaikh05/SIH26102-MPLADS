@@ -110,6 +110,157 @@ export interface Query {
   work_category?: string; min_score?: number; max_score?: number; sort?: string
 }
 
+// --------------------------------------------------------------------------- compliance
+export interface UniqueCounts {
+  total_unique_flagged_works: number
+  unique_policy_affected_works: number
+  policy_derived_reconciliation_works: number
+  unique_execution_affected_works: number
+  unflagged_baseline_works: number
+  total_works_evaluated: number
+}
+
+export interface TriggerDensity {
+  total_trigger_instances: number
+  average_triggers_per_flagged_work: number
+}
+
+export interface FinancialReconciliationOutlay {
+  total_sanctioned_outlay_all_works_cr: number
+  total_deduplicated_disbursed_outlay_all_works_cr: number
+  flagged_works_sanctioned_outlay_cr: number
+  flagged_works_deduplicated_disbursed_outlay_cr: number
+  unflagged_works_sanctioned_outlay_cr: number
+  unflagged_works_deduplicated_disbursed_outlay_cr: number
+  policy_affected_sanctioned_outlay_cr: number
+  policy_affected_deduplicated_disbursed_outlay_cr: number
+  execution_affected_sanctioned_outlay_cr: number
+  execution_affected_deduplicated_disbursed_outlay_cr: number
+  post_completion_disbursed_outlay_cr: number
+}
+
+export interface RuleSummaryStat {
+  rule_id: string
+  rule_name: string
+  authority_type: string
+  classification: string
+  source_reference: string
+  threshold: string
+  unique_works_count: number
+  percentage_of_all_works: number
+  sanctioned_outlay_cr: number
+  disbursed_outlay_cr: number
+  description: string
+  limitation: string
+  recommended_action: string
+}
+
+export interface ComplianceSummary {
+  snapshot_date: string
+  policy_baseline: string
+  total_works_evaluated: number
+  unique_counts: UniqueCounts
+  trigger_density: TriggerDensity
+  financial_outlay: FinancialReconciliationOutlay
+  rule_breakdown: Record<string, RuleSummaryStat>
+}
+
+export interface BaseDocumentMeta {
+  document_id: string
+  title: string
+  issuing_ministry: string
+  publication_year: number
+  applicable_period: string
+  source_document_url: string
+  portal_url: string
+}
+
+export interface PolicyProvisionMeta {
+  provision_id: string
+  clause_reference: string
+  heading: string
+  mandate_summary: string
+  authority_type: string
+  official_monitoring_proxy: boolean
+  source_document_url: string
+}
+
+export interface OfficialMonitoringBenchmarkMeta {
+  benchmark_id: string
+  title: string
+  authority_type: string
+  source_url: string
+  description: string
+  official_indicator_name: string
+}
+
+export interface PolicyRegistryMeta {
+  base_document: BaseDocumentMeta
+  provisions: PolicyProvisionMeta[]
+  official_monitoring_benchmarks: OfficialMonitoringBenchmarkMeta[]
+}
+
+export interface ComplianceRulesResponse {
+  registry: PolicyRegistryMeta
+  rules: RuleSummaryStat[]
+}
+
+export interface RuleEvaluation {
+  rule_id: string
+  rule_name: string
+  authority_type: string
+  classification: string
+  source_reference: string
+  is_triggered: boolean
+  observed_value: string
+  threshold: string
+  reason: string
+  limitation: string
+  recommended_action: string
+}
+
+export interface WorkComplianceRecord {
+  work_id: string
+  work_description: string
+  state: string
+  constituency: string
+  ida: string
+  mp_name: string
+  work_category: string
+  work_status: string
+  is_completed: boolean
+  sanction_amount: number
+  deduplicated_disbursed_amount: number
+  utilization_ratio: number
+  recommended_date: string | null
+  sanction_date: string | null
+  completion_date: string | null
+  last_expenditure_date: string | null
+  days_since_sanction: number | null
+  days_since_last_payment: number | null
+  triggered_rule_ids: string[]
+  evaluations: RuleEvaluation[]
+}
+
+export interface ComplianceQueuePage {
+  items: WorkComplianceRecord[]
+  total_items: number
+  page: number
+  limit: number
+  total_pages: number
+}
+
+export interface ComplianceQueueQuery {
+  page?: number
+  limit?: number
+  rule_id?: string
+  authority_type?: string
+  classification?: string
+  state?: string
+  work_category?: string
+  search?: string
+}
+
 export const isMock = import.meta.env.VITE_USE_MOCK === 'true'
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '')
 
@@ -173,4 +324,12 @@ export const api = {
     isMock ? (await mock()).duplicates(q) : get<DuplicatePage>('/api/v1/duplicates', q),
   workDuplicates: async (work_id: string): Promise<WorkDuplicatesResponse> =>
     isMock ? (await mock()).workDuplicates(work_id) : get<WorkDuplicatesResponse>(`/api/v1/duplicates/${encodeURIComponent(work_id)}`),
+  complianceSummary: async (): Promise<ComplianceSummary> =>
+    get<ComplianceSummary>('/api/v1/compliance/summary'),
+  complianceRules: async (): Promise<ComplianceRulesResponse> =>
+    get<ComplianceRulesResponse>('/api/v1/compliance/rules'),
+  complianceQueue: async (q: ComplianceQueueQuery = {}): Promise<ComplianceQueuePage> =>
+    get<ComplianceQueuePage>('/api/v1/compliance/queue', q),
+  workCompliance: async (work_id: string): Promise<WorkComplianceRecord> =>
+    get<WorkComplianceRecord>(`/api/v1/compliance/${encodeURIComponent(work_id)}`),
 }

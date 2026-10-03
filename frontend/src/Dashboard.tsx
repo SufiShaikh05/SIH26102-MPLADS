@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, sortParam, type Query } from './api/client'
 import DuplicateReview from './DuplicateReview'
+import ComplianceReview from './ComplianceReview'
 import ImplementationTrends from './ImplementationTrends'
 import { Bars, Card, Chip, Empty, ErrorBox, Loading, PRIORITY_LABELS, inr, num, pct, priorityRank, tone, useAsync } from './ui'
 
@@ -68,14 +69,20 @@ export default function Dashboard({ open }: { open: (id: string) => void }) {
   }
   const clickSort = (field: string) => { setSort(s => ({ field, dir: s.field === field && s.dir === 'desc' ? 'asc' : 'desc' })); setPage(1) }
 
-  const [activeView, setActiveView] = useState<'anomalies' | 'duplicates'>(
-    location.hash === '#/duplicates' ? 'duplicates' : 'anomalies',
+  const [activeView, setActiveView] = useState<'anomalies' | 'duplicates' | 'compliance'>(
+    location.hash === '#/duplicates'
+      ? 'duplicates'
+      : location.hash === '#/compliance'
+        ? 'compliance'
+        : 'anomalies',
   )
 
   useEffect(() => {
     const handleHash = () => {
       if (location.hash === '#/duplicates') {
         setActiveView('duplicates')
+      } else if (location.hash === '#/compliance') {
+        setActiveView('compliance')
       } else if (!location.hash || location.hash === '#/' || location.hash.startsWith('#/anomalies')) {
         setActiveView('anomalies')
       }
@@ -94,7 +101,7 @@ export default function Dashboard({ open }: { open: (id: string) => void }) {
           className={`dash-nav-btn ${activeView === 'anomalies' ? 'active' : ''}`}
           onClick={() => {
             setActiveView('anomalies')
-            if (location.hash === '#/duplicates') location.hash = ''
+            if (location.hash === '#/duplicates' || location.hash === '#/compliance') location.hash = ''
           }}
         >
           Anomaly &amp; Trends Intelligence
@@ -112,7 +119,25 @@ export default function Dashboard({ open }: { open: (id: string) => void }) {
           Potential Duplicate Detection
           <span className="dash-nav-badge">Sentinel 2.0</span>
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeView === 'compliance'}
+          className={`dash-nav-btn ${activeView === 'compliance' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveView('compliance')
+            location.hash = '#/compliance'
+          }}
+        >
+          Compliance &amp; Execution Risk
+          <span className="dash-nav-badge">Sentinel 2.0</span>
+        </button>
       </nav>
+
+      {/* Compliance & Execution Risk Intelligence View */}
+      {activeView === 'compliance' && (
+        <ComplianceReview openWork={open} />
+      )}
 
       {/* Duplicate Work Detection View */}
       {activeView === 'duplicates' && (

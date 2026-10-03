@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api, type Anomaly, type DuplicatePairRecord } from './api/client'
+import { AuthBadge, RuleTag } from './ComplianceReview'
 import { Card, Chip, ErrorBox, GateBadge, Loading, inr, num, pct, pctDec, signalText, useAsync } from './ui'
 
 export default function WorkDetail({ id, back }: { id: string; back: () => void }) {
@@ -18,6 +19,10 @@ export default function WorkDetail({ id, back }: { id: string; back: () => void 
       cluster_id: null,
       cluster_work_ids: [],
     }))
+  }, [id])
+
+  const comp = useAsync(async () => {
+    return api.workCompliance(id).catch(() => null)
   }, [id])
 
   const w = r.data
@@ -149,6 +154,114 @@ export default function WorkDetail({ id, back }: { id: string; back: () => void 
 
               <div className="dup-disclaimer" style={{ marginTop: '12px' }}>
                 <strong>Verification Note:</strong> Potential Duplicate Risk Scores identify similarity and proximity patterns for human verification. They do not constitute proof of duplication or wrongdoing.
+              </div>
+            </section>
+          )}
+
+          {/* Sentinel 2.0 Compliance & Execution Risk Intelligence */}
+          {comp.data && (
+            <section className="panel" style={{ marginTop: '16px', borderTop: '4px solid #1d4e89' }}>
+              <header>
+                <div>
+                  <h2>Compliance &amp; Execution Risk Profile</h2>
+                  <span className="muted">
+                    Evaluated against MPLADS Guidelines 2023 provisions, official MoSPI monitoring benchmarks, and operational heuristics.
+                  </span>
+                </div>
+                <div className="rule-chips-wrap">
+                  {comp.data.triggered_rule_ids && comp.data.triggered_rule_ids.length > 0 ? (
+                    comp.data.triggered_rule_ids.map(rId => <RuleTag key={rId} ruleId={rId} />)
+                  ) : (
+                    <span className="auth-badge" style={{ background: '#ecfdf3', color: '#027a48' }}>
+                      All Benchmarks Met
+                    </span>
+                  )}
+                </div>
+              </header>
+
+              <div className="trigger-highlight-banner" style={{ marginTop: '12px', marginBottom: '14px' }}>
+                <div>
+                  <h3>
+                    {(comp.data.triggered_rule_ids || []).length} Active Review Trigger(s) &amp; Execution Alert(s)
+                  </h3>
+                  <span style={{ fontSize: '13px', color: '#78350f' }}>
+                    {(comp.data.triggered_rule_ids || []).length > 0
+                      ? 'This record requires administrative review against the benchmarks below.'
+                      : 'All evaluated guideline and operational benchmarks were met for this work.'}
+                  </span>
+                </div>
+              </div>
+
+              {comp.data.evaluations && comp.data.evaluations.filter(e => e.is_triggered).length > 0 && (
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  {comp.data.evaluations.filter(e => e.is_triggered).map(e => (
+                    <div key={e.rule_id} className="rule-expl-card triggered" style={{ margin: 0 }}>
+                      <div className="rule-expl-header">
+                        <div className="rule-expl-header-left">
+                          <RuleTag ruleId={e.rule_id} />
+                          <h3>{e.rule_name}</h3>
+                        </div>
+                        <AuthBadge authority={e.authority_type} classification={e.classification} />
+                      </div>
+
+                      <div className="rule-benchmark-bar">
+                        <div className="rule-benchmark-item">
+                          <span>Observed Value</span>
+                          <strong>{e.observed_value}</strong>
+                        </div>
+                        <div className="rule-benchmark-item">
+                          <span>Benchmark Threshold</span>
+                          <strong>{e.threshold}</strong>
+                        </div>
+                        <div className="rule-benchmark-item">
+                          <span>Source Reference</span>
+                          <strong>{e.source_reference}</strong>
+                        </div>
+                      </div>
+
+                      <div className="rule-sections-trio">
+                        <div className="rule-section-box why">
+                          <h4>Why This Appears</h4>
+                          <p>{e.reason}</p>
+                        </div>
+                        <div className="rule-section-box limitation">
+                          <h4>Data Limitation</h4>
+                          <p>{e.limitation}</p>
+                        </div>
+                        <div className="rule-section-box action">
+                          <h4>Recommended Verification Action</h4>
+                          <p>{e.recommended_action}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {comp.data.evaluations && comp.data.evaluations.filter(e => !e.is_triggered).length > 0 && (
+                <details className="other-checks-summary">
+                  <summary>
+                    Other checks evaluated ({comp.data.evaluations.filter(e => !e.is_triggered).length} rules benchmark met)
+                  </summary>
+                  <div className="other-checks-list">
+                    {comp.data.evaluations.filter(e => !e.is_triggered).map(e => (
+                      <div key={e.rule_id} className="other-check-row">
+                        <div>
+                          <strong style={{ marginRight: '8px' }}>{e.rule_id}</strong>
+                          <span>{e.rule_name}</span>
+                          <span className="muted" style={{ marginLeft: '10px', fontSize: '12px' }}>
+                            (Observed: {e.observed_value}, Threshold: {e.threshold})
+                          </span>
+                        </div>
+                        <span className="other-check-status">✓ Benchmark Met</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+
+              <div className="compliance-disclaimer" style={{ marginTop: '14px', marginBottom: 0 }}>
+                <strong>Administrative Review Note:</strong> These indicators identify records requiring human review based on guidelines, official monitoring benchmarks, or operational analytics. They do not by themselves establish wrongdoing or intentional conduct.
               </div>
             </section>
           )}

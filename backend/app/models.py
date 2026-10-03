@@ -352,3 +352,23 @@ class WorkDuplicatesResponse(BaseModel):
     duplicate_pairs: list[DuplicatePairRecord] = Field(default_factory=list)
     cluster_id: str | None = None
     cluster_work_ids: list[str] = Field(default_factory=list)
+
+
+# --------------------------------------------------------------------------- compliance
+from compliance_engine.models import (
+    AuthorityType,
+    ComplianceRuleId,
+    ComplianceSummary,
+    PolicyRegistryMeta,
+    RuleClassification,
+    RuleEvaluation,
+    WorkComplianceRecord,
+)
+
+
+class ComplianceQueuePage(BaseModel):
+    items: list[WorkComplianceRecord]
+    total_items: int
+    page: int
+    limit: int
+    total_pages: int

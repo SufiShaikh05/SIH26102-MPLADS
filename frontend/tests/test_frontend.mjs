@@ -46,7 +46,7 @@ test('mock API enforces batch isolation and pagination', async () => {
   // If dist asset has a different hash, we test mock endpoints directly via a client module
 })
 
-const PROD_API = 'https://sih26102-mplads-sf1x.onrender.com'
+const PROD_API = process.env.TEST_API_URL || 'http://127.0.0.1:8000'
 
 // 3. Live API Integration Tests
 test('Live API: GET /api/v1/duplicates/summary matches verified production metrics', async () => {
@@ -175,4 +175,89 @@ test('UI Presentation: safe terminology and card hierarchy are strictly enforced
   assert.ok(cssSrc.includes('.stat-help'), 'CSS must include .stat-help')
   assert.ok(cssSrc.includes('.modal-metric-card'), 'CSS must include .modal-metric-card')
   assert.ok(cssSrc.includes('.metric-sublabel'), 'CSS must include .metric-sublabel')
+})
+
+// 5. Compliance & Execution Risk Intelligence (Phase 3) Tests
+test('Compliance UI: required text, disclaimers, and 8 rules are present', async () => {
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+  const compSrc = fs.readFileSync(path.resolve('src/ComplianceReview.tsx'), 'utf-8')
+  const dashSrc = fs.readFileSync(path.resolve('src/Dashboard.tsx'), 'utf-8')
+  const detailSrc = fs.readFileSync(path.resolve('src/WorkDetail.tsx'), 'utf-8')
+  const cssSrc = fs.readFileSync(path.resolve('src/styles.css'), 'utf-8')
+
+  // Navigation peer capability
+  assert.ok(dashSrc.includes('Compliance &amp; Execution Risk'), 'Dashboard must include Compliance & Execution Risk tab')
+  assert.ok(dashSrc.includes('ComplianceReview'), 'Dashboard must mount ComplianceReview component')
+
+  // Global Disclaimer
+  const compNorm = compSrc.replace(/\s+/g, ' ')
+  const detailNorm = detailSrc.replace(/\s+/g, ' ')
+  assert.ok(compNorm.includes('Administrative Review Note:'), 'Must include Administrative Review Note')
+  assert.ok(compNorm.includes('do not by themselves establish wrongdoing or intentional conduct'), 'Must include exact disclaimer sentence')
+  assert.ok(detailNorm.includes('do not by themselves establish wrongdoing or intentional conduct'), 'WorkDetail must include exact disclaimer sentence')
+
+  // Data Snapshot text
+  assert.ok(compNorm.includes('Data snapshot: 25 Sep 2026'), 'Must display Data snapshot: 25 Sep 2026')
+  assert.ok(compNorm.includes('Metrics shown from the current processed MPLADS dataset snapshot.'), 'Must display snapshot metrics notice')
+
+  // Financial Outlay helper text
+  assert.ok(compNorm.includes('Cumulative Deduplicated Disbursement'), 'Must display Cumulative Deduplicated Disbursement')
+  assert.ok(compNorm.includes('Deduplicated work-level disbursement metric from the 25 Sep 2026 dataset snapshot. Not an un-reconciled transaction sum or cashbook total.'), 'Must explain deduplicated disbursement metric')
+
+  // All 8 Rules Present
+  const expectedRules = ['COMP-01', 'COMP-02', 'COMP-03', 'COMP-04', 'MON-01', 'RISK-01', 'RISK-02', 'RISK-03']
+  for (const r of expectedRules) {
+    assert.ok(compSrc.includes(r), `ComplianceReview must include rule ${r}`)
+  }
+
+  // All 5 Authority / Classification Badges Present
+  const expectedBadges = [
+    'Guideline Provision',
+    'Policy-Derived Proxy',
+    'Official Monitoring',
+    'Execution Heuristic',
+    'Policy Reconciliation',
+  ]
+  for (const b of expectedBadges) {
+    assert.ok(compSrc.includes(b), `ComplianceReview must include badge ${b}`)
+  }
+
+  // Trio structure in Rule Explanation Cards
+  assert.ok(compSrc.includes('Why This Appears'), 'Must include Why This Appears section')
+  assert.ok(compSrc.includes('Data Limitation'), 'Must include Data Limitation section')
+  assert.ok(compSrc.includes('Recommended Verification Action'), 'Must include Recommended Verification Action section')
+
+  // Strictly prohibited terminology
+  const strictlyForbidden = [
+    'fraud detection',
+    'legal violations',
+    'fraud probability',
+    'statutory breach',
+    'statutory breaches',
+    'guilty',
+  ]
+  for (const term of strictlyForbidden) {
+    assert.ok(!compSrc.toLowerCase().includes(term), `ComplianceReview must not contain prohibited term: "${term}"`)
+    assert.ok(!dashSrc.toLowerCase().includes(term), `Dashboard must not contain prohibited term: "${term}"`)
+  }
+
+  // CSS classes for Compliance & Execution Risk
+  const requiredCss = [
+    '.compliance-disclaimer',
+    '.compliance-meta-bar',
+    '.auth-badge',
+    '.auth-guideline',
+    '.auth-monitoring',
+    '.auth-proxy',
+    '.auth-heuristic',
+    '.auth-reconciliation',
+    '.rule-expl-card',
+    '.rule-sections-trio',
+    '.rule-section-box',
+    '.other-checks-summary',
+  ]
+  for (const cls of requiredCss) {
+    assert.ok(cssSrc.includes(cls), `styles.css must include ${cls}`)
+  }
 })
